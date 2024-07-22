@@ -3,7 +3,11 @@ import fs from "fs";
 import http from "http";
 import { Octokit, App } from "octokit";
 import { createNodeMiddleware } from "@octokit/webhooks";
-import OpenAI from 'openai';
+import {
+    getPromptForCodeReview2,
+    getPromptPrDescription,
+    getPromptPrTitle,
+} from "./prompts.js";
 dotenv.config();
 
 const appId = process.env.APP_ID;
@@ -25,32 +29,46 @@ const app = new App({
     }),
 });
 
-const openai = new OpenAI({
-    apiKey: process.env['OPENAI_API_KEY'],
-  });
-
-  console.log('OPENAI_API_KEY ', process.env['OPENAI_API_KEY'])
-
 const { data } = await app.octokit.request("/app");
 
 app.octokit.log.debug(`Authenticated as '${data.name}'`);
 
-async function addReviewComment(octokit,owner, repo, pullNumber, commitId, path) {
-    try {
-      const response = await octokit.rest.pulls.createReviewComment({
+async function addReviewComment(
+    octokit,
+    owner,
+    repo,
+    pullNumber,
+    commitId,
+    path,
+    position,
+    codeSnippet,
+    comment
+) {
+    console.log({
         owner,
         repo,
-        pull_number: pullNumber,
-        commit_id: commitId,
+        pullNumber,
+        commitId,
         path,
-        position: 1,
-        body: "hello sammm",
-      });
-      console.log('Review comment added: ', response.data.html_url);
+        position,
+        codeSnippet,
+        comment,
+    });
+    try {
+        const response = await octokit.rest.pulls.createReviewComment({
+            owner,
+            repo,
+            pull_number: pullNumber,
+            commit_id: commitId,
+            path,
+            position: 1,
+            body: comment,
+        });
+        console.log("Review comment added: ", response.data.html_url);
     } catch (error) {
-      console.error('Error adding review comment: ', error);
+        console.error("Error adding review comment: ", error);
     }
-  }
+}
 
 // Subscribe to the "pull_request.opened" webhook event
 app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
@@ -68,23 +86,112 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
             repo,
             pull_number,
         });
-        await addReviewComment(octokit, owner,repo, pull_number, payload.pull_request.head.sha , files[0].filename);
 
-        // let diff = "";
-        // for (const file of files) {
-        //     if (file.patch) {
-        //         diff += `Changes in ${file.filename}:\n${file.patch}\n\n`;
-        //     }
-        // }
+        //PR description
+        await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "mistral",
+                prompt: getPromptPrDescription(files),
+                stream: false,
+                options: {
+                    seed: 42,
+                    top_k: 50,
+                    top_p: 0.95,
+                    temperature: 0.1,
+                    repeat_penalty: 1.2,
+                },
+            }),
+        })
+            .then((response) => response.json())
+            .then(async (data) => {
+                console.log("parseGenResponse", data);
+                await octokit.rest.pulls.update({
+                    owner,
+                    repo,
+                    pull_number,
+                    body: data.response,
+                });
+            })
+            .catch((error) => console.error("Error:", error));
 
-        // console.log("diff", diff);
+        //PR title
+        await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "mistral",
+                prompt: getPromptPrTitle(files),
+                stream: false,
+                options: {
+                    seed: 42,
+                    top_k: 50,
+                    top_p: 0.95,
+                    temperature: 0.1,
+                    repeat_penalty: 1.2,
+                },
+            }),
+        })
+            .then((response) => response.json())
+            .then(async (data) => {
+                console.log("parseGenResponse", data);
+                const parseGenResponse = JSON.parse(data.response);
 
-        // await octokit.rest.issues.createComment({
-        //     owner: payload.repository.owner.login,
-        //     repo: payload.repository.name,
-        //     issue_number: payload.pull_request.number,
-        //     body: "Hello sam",
-        // });
+                await octokit.rest.pulls.update({
+                    owner,
+                    repo,
+                    pull_number,
+                    title: parseGenResponse.title,
+                });
+            })
+            .catch((error) => console.error("Error:", error));
+        console.log(`Received a pull request event for fetch, files`, files);
+
+        //review comments for each file
+        files.forEach(async (file) => {
+            await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "mistral",
+                    prompt: getPromptForCodeReview2(file),
+                    stream: false,
+                    options: {
+                        seed: 42,
+                        top_k: 50,
+                        top_p: 0.95,
+                        temperature: 0.1,
+                        repeat_penalty: 1.2,
+                    },
+                }),
+            })
+                .then((response) => response.json())
+                .then(async (data) => {
+                    console.log(`Received a pull request event for`, data);
+
+                    await addReviewComment(
+                        octokit,
+                        owner,
+                        repo,
+                        pull_number,
+                        payload.pull_request.head.sha,
+                        file.filename,
+                        1,
+                        "parseGenAiData.code_snippet",
+                        data.response
+                    );
+                })
+                .catch((error) => console.error("Error:", error));
+        });
+
+        console.log(`Received a pull request event for catch`);
     } catch (error) {
         if (error.response) {
             console.error(
@@ -113,13 +220,4 @@ const middleware = createNodeMiddleware(app.webhooks, { path });
 http.createServer(middleware).listen(port, async () => {
     console.log(`Server is listening for events at: ${localWebhookUrl}`);
     console.log("Press Ctrl + C to quit.");
-
-    const chatCompletion = await openai.chat.completions.create({
-        messages: [
-          { role: 'user', content: 'Say this is a test' }
-        ],
-        model: 'davinci-002',
-      });
-  
-      console.log('>> ', chatCompletion.data.choices[0].message.content);
 });
