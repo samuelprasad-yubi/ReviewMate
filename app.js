@@ -8,6 +8,8 @@ import {
     getPromptPrDescription,
     getPromptPrTitle,
 } from "./prompts.js";
+import { testDataGithubCodeChanges } from "./testData.js";
+import { getDiffWithLineNumbers } from "./utils.js";
 dotenv.config();
 
 const appId = process.env.APP_ID;
@@ -88,68 +90,68 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
         });
 
         //PR description
-        await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "mistral",
-                prompt: getPromptPrDescription(files),
-                stream: false,
-                options: {
-                    seed: 42,
-                    top_k: 50,
-                    top_p: 0.95,
-                    temperature: 0.1,
-                    repeat_penalty: 1.2,
-                },
-            }),
-        })
-            .then((response) => response.json())
-            .then(async (data) => {
-                console.log("parseGenResponse", data);
-                await octokit.rest.pulls.update({
-                    owner,
-                    repo,
-                    pull_number,
-                    body: data.response,
-                });
-            })
-            .catch((error) => console.error("Error:", error));
+        // await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
+        //     method: "POST",
+        //     headers: {
+        //         "Content-Type": "application/json",
+        //     },
+        //     body: JSON.stringify({
+        //         model: "codellama:7b",
+        //         prompt: getPromptPrDescription(files),
+        //         stream: false,
+        //         options: {
+        //             seed: 42,
+        //             top_k: 50,
+        //             top_p: 0.95,
+        //             temperature: 0.1,
+        //             repeat_penalty: 1.2,
+        //         },
+        //     }),
+        // })
+        //     .then((response) => response.json())
+        //     .then(async (data) => {
+        //         console.log("parseGenResponse", data);
+        //         await octokit.rest.pulls.update({
+        //             owner,
+        //             repo,
+        //             pull_number,
+        //             body: data.response,
+        //         });
+        //     })
+        //     .catch((error) => console.error("Error:", error));
 
         //PR title
-        await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "mistral",
-                prompt: getPromptPrTitle(files),
-                stream: false,
-                options: {
-                    seed: 42,
-                    top_k: 50,
-                    top_p: 0.95,
-                    temperature: 0.1,
-                    repeat_penalty: 1.2,
-                },
-            }),
-        })
-            .then((response) => response.json())
-            .then(async (data) => {
-                console.log("parseGenResponse", data);
-                const parseGenResponse = JSON.parse(data.response);
+        // await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
+        //     method: "POST",
+        //     headers: {
+        //         "Content-Type": "application/json",
+        //     },
+        //     body: JSON.stringify({
+        //         model: "codellama:7b",
+        //         prompt: getPromptPrTitle(files),
+        //         stream: false,
+        //         options: {
+        //             seed: 42,
+        //             top_k: 50,
+        //             top_p: 0.95,
+        //             temperature: 0.1,
+        //             repeat_penalty: 1.2,
+        //         },
+        //     }),
+        // })
+        //     .then((response) => response.json())
+        //     .then(async (data) => {
+        //         console.log("parseGenResponse", data);
+        //         const parseGenResponse = JSON.parse(data.response);
 
-                await octokit.rest.pulls.update({
-                    owner,
-                    repo,
-                    pull_number,
-                    title: parseGenResponse.title,
-                });
-            })
-            .catch((error) => console.error("Error:", error));
+        //         await octokit.rest.pulls.update({
+        //             owner,
+        //             repo,
+        //             pull_number,
+        //             title: parseGenResponse.title,
+        //         });
+        //     })
+        //     .catch((error) => console.error("Error:", error));
         console.log(`Received a pull request event for fetch, files`, files);
 
         //review comments for each file
@@ -160,8 +162,11 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    model: "mistral",
-                    prompt: getPromptForCodeReview2(file),
+                    model: "codellama:7b",
+                    prompt: getPromptForCodeReview2({
+                        ...file,
+                        patch: getDiffWithLineNumbers(file),
+                    }),
                     stream: false,
                     options: {
                         seed: 42,
@@ -220,4 +225,28 @@ const middleware = createNodeMiddleware(app.webhooks, { path });
 http.createServer(middleware).listen(port, async () => {
     console.log(`Server is listening for events at: ${localWebhookUrl}`);
     console.log("Press Ctrl + C to quit.");
+
+    // await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
+    //     method: "POST",
+    //     headers: {
+    //         "Content-Type": "application/json",
+    //     },
+    //     body: JSON.stringify({
+    //         model: "codellama:7b",
+    //         prompt: getPromptForCodeReview2(testDataGithubCodeChanges),
+    //         stream: false,
+    //         options: {
+    //             seed: 42,
+    //             top_k: 50,
+    //             top_p: 0.95,
+    //             temperature: 0.1,
+    //             repeat_penalty: 1.2,
+    //         },
+    //     }),
+    // })
+    //     .then((response) => response.json())
+    //     .then(async (data) => {
+    //         console.log(`Received a pull request event for`, data);
+    //     })
+    //     .catch((error) => console.error("Error:", error));
 });

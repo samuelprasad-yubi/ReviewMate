@@ -37,15 +37,15 @@ export const getPromptForCodeReview2 = (
     hello2
 ) => `I have a pull request with several modified files, and I need a detailed code review. Please provide review suggestions in an array of comments with code snippets and paths for each file. Include the following necessary practices in your review:
 
-Code Quality: Ensure the code adheres to best practices, is readable, and maintainable.
-Functionality: Verify that the code changes are functionally correct.
-UI Changes: If applicable, review the impact on the user interface.
-Parallel Programming Safety: Check for any concurrency issues.
-Complexity: Suggest ways to simplify complex logic.
-Feature Necessity: Comment on the necessity of the added features.
-Unit Tests: Ensure there are appropriate unit tests for the changes.
-Naming Conventions: Verify that variable, function, and class names are meaningful and follow naming conventions.
-Comments: Ensure there are appropriate comments for complex code sections.
+ Ensure the code adheres to best practices, is readable, and maintainable.
+ Verify that the code changes are functionally correct.
+If applicable, review the impact on the user interface.
+ Check for any concurrency issues.
+ Suggest ways to simplify complex logic.
+ Comment on the necessity of the added features.
+ Ensure there are appropriate unit tests for the changes.
+ Verify that variable, function, and class names are meaningful and follow naming conventions.
+ Ensure there are appropriate comments for complex code sections.
 Review the following code changes : ${JSON.stringify(hello2)}
 The analysis can be on a single line or a whole function; it may not always cover the entire file. In the code_snippet field, only the added or modified changes should be shown.
 You can add multiple comments for the same code snippet or file if there are multiple suggestions. Add comments for multiple files also if there are any.
@@ -55,6 +55,7 @@ You can add multiple comments for the same code snippet or file if there are mul
 ### code review comments
 code review comments with code snippet, code snippet should be github pr code snippet formate
 comments should in sequence of code snippet and should be in list format
+add position of the code snippet
 
 
 `;
