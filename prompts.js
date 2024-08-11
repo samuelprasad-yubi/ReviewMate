@@ -1,3 +1,13 @@
+{
+    /* <s>: the beginning of the entire sequence.
+<<SYS>>: the beginning of the system message.
+<</SYS>>: the end of the system message.
+[INST]: the beginning of some instructions.
+[/INST]: the end of some instructions.
+{{ system_prompt }}: Where the user should edit the system prompt to give overall context to model responses.
+/{{ user_message }}: Where the user should provide instructions to the model for generating outputs. */
+}
+
 export const getPromptForCodeReview = (hello) => `
 Please review the following code changes from a GitHub pull request. Analyze the changes and provide necessary suggestions.
 1. Ensure the code is well-designed and follows best practices.
@@ -33,9 +43,8 @@ Respond in the following JSON format. all fields of object are required and valu
 ]'`;
 // "position": "<position of the code where comment has to be added for the code_snippet in the github pull request,The line index in the diff of the pull request where the comment should be placed. This helps in positioning the comment accurately within the diff >",
 
-export const getPromptForCodeReview2 = (
-    hello2
-) => `I have a pull request with several modified files, and I need a detailed code review. Please provide review suggestions in an array of comments with code snippets and paths for each file. Include the following necessary practices in your review:
+export const getPromptForCodeReview2 = (hello2, fileContent) => `
+<s> [INST]
 
  Ensure the code adheres to best practices, is readable, and maintainable.
  Verify that the code changes are functionally correct.
@@ -47,6 +56,10 @@ If applicable, review the impact on the user interface.
  Verify that variable, function, and class names are meaningful and follow naming conventions.
  Ensure there are appropriate comments for complex code sections.
 Review the following code changes : ${JSON.stringify(hello2)}
+here im sharing the whole code of the file to understand about the patch code that belongs to the file.
+file content: ${fileContent}.
+understand the whole code of the file to provide the comments on the code changes.
+
 The analysis can be on a single line or a whole function; it may not always cover the entire file. In the code_snippet field, only the added or modified changes should be shown.
 You can add multiple comments for the same code snippet or file if there are multiple suggestions. Add comments for multiple files also if there are any.
 
@@ -58,7 +71,32 @@ comments should in sequence of code snippet and should be in list format
 add position of the code snippet
 
 
+     ## Pull Request Review Comments template
+         ### code review comments
+         code review comments with code snippet, code snippet should be github pr code snippet formate
+         comments should in sequence of code snippet and should be in list format.
+         add explanation here why the code needs improvement, and also add code suggestions for the code snippet.
+ 
+ [/INST]
 `;
+
+// ### explanation:
+// - add explanation here why the code needs improvement.
+// - short and clear explanation with basic english
+
+// ### suggestion:
+// - add suggestion here for the code changes along with code if necessary.
+// - short and clear explanation with basic english , add code snippet if necessary.
+// code_review_comments with code snippet, code snippet should be github pr code snippet formate.
+// Respond in the following JSON format. all fields of object are required and values should be there.
+
+// "code_snippets" :[
+//     {
+//        "code_review_comments": "<comments with necessary suggestion here for the code snippet, add multiple comments also if there are any>",
+//         "start_line": "<starting line of the code snippet for which comments needs to be added>",
+//         "end_line": "<ending line of the code snippet for which comments needs to be added>",
+//     }
+// ]
 
 export const getPromptPrDescription = (
     hello3
@@ -85,7 +123,7 @@ Provide a concise overview of the changes introduced in this PR. Describe the pr
 - Issue
 - Issue 
 
-### Changes Made (in Each file):
+### Changes Made:
 Briefly list the main changes made in this PR. Include key additions, deletions, or modifications.
 
 - Change 1

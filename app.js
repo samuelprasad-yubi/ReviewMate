@@ -156,6 +156,24 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
 
         //review comments for each file
         files.forEach(async (file) => {
+            const { data: content } = await octokit.rest.repos.getContent({
+                owner,
+                repo,
+                path: file.filename,
+                ref: "refs/pull/" + pull_number + "/head", // Get the content from the pull request branch
+            });
+
+            const fileContent = Buffer.from(content.content, "base64").toString(
+                "utf8"
+            );
+            // console.log(`File: ${file.filename}`);
+            // console.log("fileContent", fileContent);
+
+            const prompt = getPromptForCodeReview2(
+                { ...file, patch: getDiffWithLineNumbers(file) },
+                fileContent
+            );
+            console.log("prompt", prompt);
             await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
                 method: "POST",
                 headers: {
@@ -172,7 +190,7 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
                         seed: 42,
                         top_k: 50,
                         top_p: 0.95,
-                        temperature: 0.1,
+                        temperature: 0.9,
                         repeat_penalty: 1.2,
                     },
                 }),
