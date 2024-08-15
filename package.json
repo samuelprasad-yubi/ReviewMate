@@ -6,18 +6,29 @@
     "type": "module",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "server": "node app.js"
+        "server": "node  --watch app.js"
     },
     "keywords": [],
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "@typescript-eslint/eslint-plugin": "^8.1.0",
+        "@typescript-eslint/parser": "^8.1.0",
+        "@typescript-eslint/typescript-estree": "^8.1.0",
+        "acorn": "^8.12.1",
         "dotenv": "^16.4.5",
+        "eslint": "^9.9.0",
         "localtunnel": "^2.0.2",
         "octokit": "^4.0.2",
-        "openai": "^4.52.7"
+        "openai": "^4.52.7",
+        "p-limit": "^6.1.0",
+        "typescript": "^5.5.4"
     },
     "devDependencies": {
-        "smee-client": "^2.0.1"
+        "@eslint/js": "^9.9.0",
+        "eslint-plugin-react": "^7.35.0",
+        "globals": "^15.9.0",
+        "smee-client": "^2.0.1",
+        "typescript-eslint": "^8.1.0"
     }
 }

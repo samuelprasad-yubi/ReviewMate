@@ -174,3 +174,171 @@ Respond in the following JSON format:
   "Explanation": "<Explanation of the changes made in the PR>"
   }
 `;
+
+const suggestionSample = `
+A suggestion is a code block in GitHub that allows reviewers to propose specific code changes directly in pull requests. The code inside a suggestion block can be applied by the author with a single click, making it easier to implement feedback.
+For example, if you suggest a more efficient way to write a function, you can wrap your proposed change in a suggestion block, so the author can quickly adopt your recommendation.
+I am working on a GitHub pull request and I need you to generate a code suggestion.
+The suggestion should be formatted using the GitHub suggestion code block syntax. 
+ensuring that the suggestion is wrapped inside the \`\`\`suggestion code block. Here's an example of how it should look:
+example: 
+Original code:
+function addNumbers(a, b) {
+    return a + b;
+}
+Suggested change:
+\`\`\`suggestion
+function addNumbers(a, b) {
+    // Ensure the inputs are numbers
+    if (typeof a !== 'number' || typeof b !== 'number') {
+        throw new Error('Both arguments must be numbers');
+    }
+    return a + b;
+}`;
+
+export const reviewFileDiffFun = (file) => `
+
+## IMPORTANT Instructions
+
+Input: New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.
+Task: Review new hunks for substantive issues using provided context and respond with comments if necessary. For issues that require fixes, provide the fixes using suggestion code blocks.
+Output: Review comments in markdown with exact line number ranges in new hunks. Start and end line numbers must be within the same hunk. For single-line comments, start=end line number. Must use example response format below.
+Don't annotate code snippets with line numbers. Format and indent code correctly.
+For minor fixes, use \`suggestion\` code blocks, ${suggestionSample}. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
+
+
+## Example
+
+### Example changes
+
+---new_hunk---
+\`\`\`
+  z = x / y
+    return z
+
+20: def add(x, y):
+21:     z = x + y
+22:     retrn z
+23: 
+24: def multiply(x, y):
+25:     return x * y
+
+def subtract(x, y):
+  z = x - y
+\`\`\`
+  
+---old_hunk---
+\`\`\`
+  z = x / y
+    return z
+
+def add(x, y):
+    return x + y
+
+def subtract(x, y):
+    z = x - y
+\`\`\`
+
+---comment_chains---
+\`\`\`
+Please review this change.
+\`\`\`
+
+---end_change_section---
+
+### Example response
+data: [{
+ startLine: 22,
+ endLine: 23,
+comment: "There's a syntax error in the add function.
+\`\`\`suggestion
+     return z
+"}]
+
+
+## code review comments
+code review comments with code snippet, code snippet should be github pr code snippet formate
+comments should in sequence of code snippet and should be in list format
+add position of the code snippet
+
+
+     ## Pull Request Review Comments template
+         ### code review comments
+         code review comments with code snippet, code snippet should be github pr code snippet formate
+         comments should in sequence of code snippet and should be in list format.
+         add explanation here why the code needs improvement, and also add code suggestions for the code snippet.
+
+         ## review this code changes
+## Changes made to \`${file.fileName}\` for your review
+ ${file.patch}
+
+
+### respond JSON formate
+Strictly respond in JSON formate. the JSON should have the following format:
+#typescript interface
+"interface Response {
+  data: Array<{startLine: number; endLine: number; comment: string}>
+}"
+starLine, endLine, comment fields are required and values should be there.
+
+`;
+//Please provide a JSON response in the following format, with an array of objects containing the start and end lines along with a comment:
+
+export const getSuggestionCommandPrompt = (file) => {
+    return `I am working on a GitHub pull request and I need you to generate a code suggestion.
+            Input: Code snippet with a issue that requires a fix. review the code changes and provide a suggestion to fix the issue.
+            
+            Task: Provide a suggestion to fix the issue using a suggestion code block.
+            Output: Suggestion code block with the proposed fix.
+            Format: Use the GitHub suggestion code block syntax to wrap the proposed fix.
+            ${suggestionSample}
+
+            ---start_of_context---
+            ## context of the code changes, file content.
+            ${file.fileContent}
+            ---end of context---
+            
+           
+              
+            ---start_of_code_review---
+           ## review this code changes, strictly give code block suggestion on this changes only. 
+           ## return the whole code snippet along with suggested changes in the suggestion code block. don't add bug in the suggestion.
+           ## this code is part of the file content provided above. take that as a context and provide the suggestion.
+           ## these are the selected lines of the code snippet from above file content in the github PR for suggestion.
+           ## the suggested changes should be syntatically correct,  verify your code suggestion is correctly fits with the file content provided above if not correct it, sometimes you are adding "}" in code suggestion  even though its present in next line which i have not sent it.
+           ## dont add comments and line numbers inside the code suggestion.
+           ## add only the code that replaces the selected lines and dont add continuation of the code from the file content provided above.
+           
+           selected lines:
+        
+              ${file?.selectedLines || ""}
+
+               ${
+                   file.promptText
+                       ? `## user prompt text, do what the user says: ${file.promptText}`
+                       : ""
+               }
+            ---end_of_code_review---
+
+    `;
+};
+
+// ---start_of_code_review---
+// ## review this code changes, strictly give code block suggestion on this changes only.
+// ## return the whole code snippet along with suggested changes in the suggestion code block. don't add bug in the suggestion.
+// ## this code is part of the file content provided above. take that as a context and provide the suggestion.
+// ## these are the selected lines of the code snippet from above file content in the github PR for suggestion.
+// ## the suggested changes should be syntatically correct,  verify your code suggestion is correctly fits with the file content provided above if not correct it, sometimes you are adding "}" in code suggestion  even though its present in next line which i have not sent it.
+// ## dont add comments and line numbers inside the code suggestion.
+// ## add only the code that replaces the selected lines and dont add continuation of the code from the file content provided above.
+
+// selected lines:
+
+//    ${file?.selectedLines || ""}
+
+//     ${
+//         file.promptText
+//             ? `## user prompt text, do what the user says: ${file.promptText}`
+//             : ""
+//     }
+//  ---end_of_code_review---
