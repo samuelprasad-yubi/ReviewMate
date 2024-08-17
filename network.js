@@ -5,7 +5,7 @@ export const connectLLm = async ({ prompt, options = {} }) => {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            model: "llama3.1:latest",
+            model: "llama2:13b",
             prompt,
             stream: false,
             temperature: 0.8,

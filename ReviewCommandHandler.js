@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 import { connectLLm } from "./network.js";
 import { getSuggestionCommandPrompt } from "./prompts.js";
+import GitHubService from "./services/GitHubService.js";
 
 export class ReviewCommandHandler {
     constructor(octokit, payload) {
@@ -8,7 +9,7 @@ export class ReviewCommandHandler {
         this.owner = payload.repository.owner.login;
         this.repo = payload.repository.name;
         this.issue_number = payload.pull_request.number;
-        this.file_path = payload.comment.path;
+        this.comment_file_path = payload.comment.path;
         this.head_commit_sha = payload.pull_request.head.sha;
         this.comment_body = payload.comment.body;
         this.comment_id = payload.comment.id;
@@ -20,9 +21,6 @@ export class ReviewCommandHandler {
 
     async handleCommand(command, promptText) {
         switch (command) {
-            case "pause":
-                await this.handlePauseCommand(promptText);
-                break;
             case "suggestion":
                 await this.handleSuggestionCommand(promptText);
                 break;
@@ -31,23 +29,15 @@ export class ReviewCommandHandler {
         }
     }
 
-    async handlePauseCommand(promptText) {
-        const replyBody = `Review process paused for PR #${this.issue_number}. Reason: "${promptText}".`;
-        await this.octokit.rest.issues.createComment({
-            owner: this.owner,
-            repo: this.repo,
-            issue_number: this.issue_number,
-            body: replyBody,
-        });
-    }
-
     async handleSuggestionCommand(promptText) {
-        console.log("start line", {
-            start_line: this.start_line,
-            end_line: this.end_line,
-        });
+        // console.log("start line", {
+        //     start_line: this.start_line,
+        //     end_line: this.end_line,
+        // });
         try {
-            const fileContent = await this.gitHubService.getContent();
+            const fileContent = await this.gitHubService.getContent({
+                path: this.comment_file_path,
+            });
             const fileLines = fileContent.split("\n");
 
             let affectedLinesArr = fileLines.slice(
@@ -68,7 +58,7 @@ export class ReviewCommandHandler {
                 .map((line, index) => `${index + 1}: ${line}`)
                 .join("\n");
 
-            console.log(affectedLinesString, fileLinesString);
+            // console.log(affectedLinesString, fileLinesString);
 
             await connectLLm({
                 prompt: getSuggestionCommandPrompt({
@@ -79,8 +69,11 @@ export class ReviewCommandHandler {
                     end_line: this.end_line,
                 }),
             }).then((response) => {
-                console.log("Response from the model:", response);
-                this.createReplyForReviewComment(response.response);
+                // console.log("Response from the model:", response);
+                this.gitHubService.createReplyForReviewComment({
+                    replyBody: response.response,
+                    comment_id: this.comment_id,
+                });
             });
 
             return affectedLinesString;
@@ -90,30 +83,6 @@ export class ReviewCommandHandler {
     }
 
     async unknownCommand(command) {
-        const replyBody = `Unknown command: ${command}`;
-        await this.octokit.issues.createComment({
-            owner: this.owner,
-            repo: this.repo,
-            issue_number: this.issue_number,
-            body: replyBody,
-        });
-    }
-
-    async createReplyForReviewComment(replyBody) {
-        try {
-            await this.octokit.rest.pulls.createReplyForReviewComment({
-                owner: this.owner,
-                repo: this.repo,
-                pull_number: this.issue_number,
-                comment_id: this.comment_id,
-                body: replyBody,
-            });
-            console.log(
-                "Successfully replied to the comment:",
-                this.comment_id
-            );
-        } catch (error) {
-            console.error("Error replying to the comment:", error);
-        }
+        console.log(`Unknown command: ${command}`);
     }
 }

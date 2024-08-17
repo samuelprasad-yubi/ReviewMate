@@ -6,7 +6,8 @@
     "type": "module",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "server": "node  --watch app.js"
+        "server": "node app.js",
+        "server:w": "node  --watch app.js"
     },
     "keywords": [],
     "author": "",
@@ -22,12 +23,16 @@
         "octokit": "^4.0.2",
         "openai": "^4.52.7",
         "p-limit": "^6.1.0",
+        "path": "^0.12.7",
         "typescript": "^5.5.4"
     },
     "devDependencies": {
         "@eslint/js": "^9.9.0",
+        "eslint-config-prettier": "^9.1.0",
+        "eslint-plugin-prettier": "^5.2.1",
         "eslint-plugin-react": "^7.35.0",
         "globals": "^15.9.0",
+        "prettier": "^3.3.3",
         "smee-client": "^2.0.1",
         "typescript-eslint": "^8.1.0"
     }

@@ -123,6 +123,13 @@ export const parsePatch = (patch) => {
 
 export function parseReview(response, patches) {
     const reviews = [];
+    if (
+        !Array.isArray(response) ||
+        response.length === 0 ||
+        patches.length === 0
+    ) {
+        return reviews;
+    }
 
     for (const review of response) {
         const { startLine, endLine, comment } = review;
@@ -167,8 +174,8 @@ export function parseReview(response, patches) {
                 adjustedComment = `Note: This review was outside of the patch, Original lines [${startLine}-${endLine}]
   
   ${comment}`;
-                adjustedStartLine = patches[0][0];
-                adjustedEndLine = patches[0][1];
+                adjustedStartLine = patches[0].startLine;
+                adjustedEndLine = patches[0].startLine;
             }
         }
 

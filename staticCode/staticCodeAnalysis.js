@@ -9,7 +9,7 @@ import parse from "@typescript-eslint/parser";
 //     range: true,
 // });
 
-function tsParseFun(content) {
+export function tsParseFun(content) {
     const context = {
         languageOptions: {
             parserOptions: {
@@ -28,9 +28,7 @@ function tsParseFun(content) {
 
 // tsParseFun("const hello: string = 'world';");
 
-// const { parseForESLint } = require("@typescript-eslint/parser");
-
-function analyzeCodee(code) {
+export function analyzeCodee(code) {
     const parserOptions = {
         ecmaVersion: 2020,
         sourceType: "module",
@@ -63,7 +61,7 @@ function traverseAST(ast) {
 }
 
 // Example TypeScript code to analyze
-const code = `
+export const code = `
 import CAAlert from '@yubi/yb-core-alert';
 
 const AlertView = () => {
@@ -87,19 +85,19 @@ const AlertView = () => {
 export default AlertView;
 `;
 
-// analyzeCodee(code);
+// analyzeCode(code);
 
 // const { ESLint } = require("eslint");
 import { ESLint } from "eslint";
 // const tsRecommended = require("@typescript-eslint/eslint-plugin").configs
 //     .recommended; // TS recommended rules
-import tsConfigs from "@typescript-eslint/eslint-plugin";
+// import tsConfigs from "@typescript-eslint/eslint-plugin";
 
 export async function analyzeWithESLint(code) {
     const eslint = new ESLint();
 
     const results = await eslint.lintText(code, { filePath: "example.tsx" });
-    console.log("results", results);
+    // console.log("results", results);
     // Output the linting results
     // results.forEach((result) => {
     //     return result.messages.forEach((message) => {
@@ -111,35 +109,62 @@ export async function analyzeWithESLint(code) {
 
     return results;
 }
-const codee = `
+export const codee = `
 
 import React from 'react';
 const MyComponent = () => {
+    const x:any=0;
   return <UndefinedComponent />;
 };
 export default MyComponent;
 
 `;
 
-// analyzeWithESLint(codee);
+// const x = await analyzeWithESLint(codee);
+// console.log(x[0].messages);
 
+const codeChange = `
+const x=10; 
+const y=10; 
+let z=10; 
+
+if(x==10){
+   if(y=10){
+   
+   if(z=10){
+     if(b==10){
+
+      if(b==10){
+
+       if(b==10){
+     
+     }
+     
+     }
+     
+     }
+   }
+   }
+} 
+
+`;
+console.log(analyzeCode(codeChange));
 export function analyzeCode(code) {
     try {
-        const tree = parse(code, {
+        const tree = parse.parse(code, {
             ecmaVersion: 2020,
-            locations: true,
-            loc: true,
             range: true,
             comment: true,
-            jsx: true,
             jsDocParsingMode: "none",
-            allowInvalidAST: true,
             debugLevel: true,
         });
+        // console.log("tree", tree);
         const analysisResult = [];
         walkNode(tree, 0, analysisResult);
         return analysisResult;
     } catch (error) {
+        console.log("error", error);
+
         return [
             {
                 message: `Syntax Error: ${error.message}`,
@@ -213,7 +238,10 @@ function walkNode(node, depth = 0, analysisResult) {
 
         // Condition 5: Detect deeply nested code
         case "BlockStatement":
-            if (depth > 3) {
+            if (depth >= 9) {
+                // console.log(depth, node.body?.[0].consequent);
+                console.log(depth);
+
                 // Adjust depth threshold as needed
                 analysisResult.push({
                     message: `Deeply nested code found.`,
@@ -244,6 +272,8 @@ function walkNode(node, depth = 0, analysisResult) {
     // Recursively walk through children nodes
     for (const key of Object.keys(node)) {
         if (node[key] && typeof node[key] === "object") {
+            // console.log(depth);
+
             walkNode(node[key], depth + 1, analysisResult);
         }
     }
