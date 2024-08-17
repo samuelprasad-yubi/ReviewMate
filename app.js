@@ -61,8 +61,12 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
 });
 
 app.webhooks.on(
-    "pull_request_review_comment.created",
+    ["pull_request_review_comment.created", "pull_request.reopened"],
     async ({ octokit, payload }) => {
+        if (payload.action === "reopened") {
+            console.log("payload", payload);
+            return;
+        }
         const comment_author = payload.comment.user.login;
         const comment_body = payload.comment.body;
 

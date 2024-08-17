@@ -56,8 +56,8 @@ class GitHubService {
             );
             return filesData.filter(
                 (file) =>
-                    file.patch ||
-                    file.filename ||
+                    file.patch &&
+                    file.filename &&
                     filesAllowedForCodeReview.test(file.filename)
             );
         } catch (error) {

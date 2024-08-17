@@ -52,11 +52,21 @@ class ReviewService {
                 data,
                 filteredFile.patches
             );
+
+            // const data2 = await connectLLm({
+            //     prompt,
+            //     options: { format: "json", model: "codellama:7b" },
+            // });
+
+            // const parsedReviewComments2 = this.parseLLMResponse(
+            //     data2,
+            //     filteredFile.patches
+            // );
             // console.log({ parsedReviewComments });
-            this.addCommentsToBuffer(
-                filteredFile.file.filename,
-                parsedReviewComments
-            );
+            this.addCommentsToBuffer(filteredFile.file.filename, [
+                ...parsedReviewComments,
+                // ...parsedReviewComments2,
+            ]);
         } catch (e) {
             console.log(e);
         }

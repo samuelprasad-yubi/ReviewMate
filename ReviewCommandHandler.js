@@ -58,9 +58,9 @@ export class ReviewCommandHandler {
                 .map((line, index) => `${index + 1}: ${line}`)
                 .join("\n");
 
-            // console.log(affectedLinesString, fileLinesString);
+            console.log(affectedLinesString, fileLinesString);
 
-            await connectLLm({
+            const response = await connectLLm({
                 prompt: getSuggestionCommandPrompt({
                     selectedLines: affectedLinesString,
                     fileContent: fileLinesString,
@@ -68,14 +68,12 @@ export class ReviewCommandHandler {
                     start_line: this.start_line,
                     end_line: this.end_line,
                 }),
-            }).then((response) => {
-                // console.log("Response from the model:", response);
-                this.gitHubService.createReplyForReviewComment({
-                    replyBody: response.response,
-                    comment_id: this.comment_id,
-                });
             });
 
+            this.gitHubService.createReplyForReviewComment({
+                replyBody: response.response,
+                comment_id: this.comment_id,
+            });
             return affectedLinesString;
         } catch (e) {
             console.log("Error", e);
