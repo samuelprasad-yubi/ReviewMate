@@ -200,27 +200,32 @@ export const reviewFileDiffFunPrompt = (file) => `
 
 ## IMPORTANT Instructions
 
-**Input:** New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.
+**Input:** New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.And File content after modification for the context of the code changes.
 
-**Task:** Review the new hunks for substantive issues by utilizing the provided context. For any identified issues, provide comments and, if necessary, suggest fixes using code snippets.
+**Task:** Review the new hunks for substantive issues by utilizing the provided File Content and Example context. For any identified issues, provide comments and suggest fixes using \`diff\` code blocks, marking changes with \`+\` or \`-\` for code suggestions and also use code snippets.
 check for missing edge cases in the code, suggest feedback why this it is a issue and you must provide in detailed explaination if issue is critical with code snippet, suggestion, diff code blocks
-mention criticality of the issue.
-- critical (red)
-- high  (orange)
-- medium (yellow)
-- low  (green)
 
-**Output:** Your response should include review comments in JSON format, specifying the exact line number ranges in the new hunks where the comment applies. The start and end line numbers should fall within the same hunk. For single-line comments, use the same number for both start and end line.
+
+*** Guidance on Using File Content***
+1. **Contextual Understanding:** Use the entire file content to understand the purpose and logic of the modified code. Consider how the functions, variables, and logic interact across the file to achieve the intended functionality. This will help you assess whether the new code changes are consistent with the overall design and intent of the file.
+2. **Code Use Case:** Reflect on how the modified code works within the broader context of the file. Understanding the use case can help you identify issues such as logic errors, performance concerns, or deviations from best practices.
+3. **Focus on Changes:** While the entire file content is provided to give you context, your review should focus solely on the new code changes presented in the new hunks. Do not review or comment on parts of the file that are outside the scope of these changes. Concentrate on identifying issues or improvements related specifically to the modifications.
 
 For minor fixes, use \`suggestion\` code blocks. The line number range in the fix snippet must exactly match the range to be replaced in the new hunk.
-use \`diff\` code blocks, marking changes with \`+\` or \`-\`. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
+Format: Use the GitHub suggestion code block syntax to wrap the proposed fix.
+${suggestionSample}
+
+
+**Output:** Your response should include review comments in JSON format, specifying the exact line number ranges in the new hunks where the comment applies. The start and end line numbers should fall within the same hunk. For single-line comments, use the same number for both start and end line.
 
 If there are no issues found on a line range, you MUST respond with the 
 text \`LGTM!\` for that line range in the review section. 
 
+
 ### Example
 
 **Example Changes:**
+[INST] must not comment on the example changes[/INST]
 
 ---file_content---
 \`\`\`
@@ -288,23 +293,12 @@ def subtract(x, y):
 
 ## Review Template
 
-- **File Reviewed:** \`${file.fileName}\`
 - **File Content After Modifications:** (This is the entire content of the file after modifications were made)
   \`\`\`
   ${file.content}
   \`\`\`
+  
 - **Code Changes:** ${file.patch}
-
-
-### Guidance on Using File Content:
-
-1. **Contextual Understanding:** Use the entire file content to understand the purpose and logic of the modified code. Consider how the functions, variables, and logic interact across the file to achieve the intended functionality. This will help you assess whether the new code changes are consistent with the overall design and intent of the file.
-
-2. **Code Use Case:** Reflect on how the modified code works within the broader context of the file. Understanding the use case can help you identify issues such as logic errors, performance concerns, or deviations from best practices.
-
-3. **Focus on Changes:** While the entire file content is provided to give you context, your review should focus solely on the new code changes presented in the new hunks. Do not review or comment on parts of the file that are outside the scope of these changes. Concentrate on identifying issues or improvements related specifically to the modifications.
-
-
 
 ## Respond in JSON Format
 
@@ -315,13 +309,30 @@ interface Response {
   data: Array<{startLine: number; endLine: number; comment: string}>
 }
 \`\`\`
+all the fields and its values are required.
 
-- **startLine**: The line number in the new hunk where the review comment should start.
-- **endLine**: The line number in the new hunk where the review comment should end.
-- **comment**: Your review comment with any suggested code changes.
+[INST] <<SYS>> \n strictly review the code on the code changes only not on the file content or example code \n<</SYS>>\n 
+User: give detailed code review in the comments fields 
+you much include diff code block if you are suggestion a code fix  \`\`\`diff\`\`\` code blocks, marking changes with \`+\` or \`-\` for code suggestions. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
+you much include a emojis in the comments for example if the comment is about a bug, show 🐞,
+show 💡 for insights etc.
+Mention line numbers in each comment.
+You must give positive feedback as well if you find best practices.
+if you suggesting something you much include example code snippet on how to do it.
+not only feedback on the bug you must always provide the solution.
+you must mention criticality of the issue in the each comment if is a bug.
+- critical (show in red color)
+- high  (show in orange color)
+- medium (show in yellow color)
+- low  (show in green color)
 
-Please ensure the comments are clear, concise, and sequentially ordered according to the code snippets.
+ [/INST]
+
 `;
+
+// - **startLine**: The line number in the new hunk where the review comment should start.
+// - **endLine**: The line number in the new hunk where the review comment should end.
+// - **comment**: Your detailed review comment with any suggested code changes.
 
 //Please provide a JSON response in the following format, with an array of objects containing the start and end lines along with a comment:
 
@@ -347,8 +358,8 @@ export const getSuggestionCommandPrompt = (file) => {
            # this code is part of the file content provided above. take that as a context and provide the suggestion.
            # these are the selected lines of the code snippet from above file content in the github PR for suggestion.
            # the suggested changes should be syntatically correct,  verify your code suggestion is correctly fits with the file content provided above if not correct it, sometimes you are adding "}" in code suggestion  even though its present in next line which i have not sent it.
-           # dont add comments and line numbers inside the code suggestion.
-           # add only the code that replaces the selected lines and dont add continuation of the code from the file content provided above.
+           # don't add comments and line numbers inside the code suggestion.
+           # add only the code that replaces the selected lines and don't add continuation of the code from the file content provided above.
            
            selected lines:
         
@@ -356,7 +367,7 @@ export const getSuggestionCommandPrompt = (file) => {
 
                ${
                    file.promptText
-                       ? `## user prompt text, do what the user says: ${file.promptText}`
+                       ? `## this is the  user prompt text, you must do what the user says: ${file.promptText}`
                        : ""
                }
             ---end_of_code_review---
