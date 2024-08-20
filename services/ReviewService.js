@@ -1,7 +1,10 @@
 /* eslint-disable no-console */
 import { addPatchEndComment, generateCommentData } from "../helper.js";
 import { connectLLm } from "../network.js";
-import { reviewFileDiffFunPrompt } from "../prompts.js";
+import {
+    reviewFileDiffFunPrompt,
+    summarizeIntoShortDescription,
+} from "../prompts.js";
 import { parseReview } from "../utils.js";
 
 class ReviewService {
@@ -22,27 +25,34 @@ class ReviewService {
             });
     };
 
-    byAI = async (filteredFiles) => {
+    byAI = async ({ filteredFiles }) => {
         for (const filteredFile of filteredFiles) {
             await this.processFilePatches(filteredFile);
         }
     };
 
     processFilePatches = async (filteredFile) => {
-        const patchText = filteredFile.patches
-            .map((patch) => {
-                return addPatchEndComment(patch.hunksStr);
-            })
-            .join("\n");
-
-        const prompt = reviewFileDiffFunPrompt({
-            fileName: filteredFile.file.filename,
-            patch: patchText,
-            content: filteredFile.fileContent,
-        });
-
-        // console.log("prompt", { prompt });
         try {
+            const patchText = filteredFile.patches
+                .map((patch) => {
+                    return addPatchEndComment(patch.hunksStr);
+                })
+                .join("\n");
+            //summarizeIntoShortDescription
+            const summary = await connectLLm({
+                prompt: summarizeIntoShortDescription(filteredFile),
+                options: { system: "programmer" },
+            });
+            console.log("summary", summary.response);
+            const prompt = reviewFileDiffFunPrompt({
+                fileName: filteredFile.file.filename,
+                patch: patchText,
+                content: filteredFile.fileContent,
+                summary: summary.response,
+            });
+
+            // console.log("prompt", { prompt });
+
             const data = await connectLLm({
                 prompt,
                 options: { format: "json" },

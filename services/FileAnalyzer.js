@@ -1,7 +1,7 @@
 import { getHunksStr } from "../helper.js";
 import { parsePatch, patchStartEndLine, splitPatch } from "../utils.js";
 
-export const analyzeFilesForReview = async ({ files, githubService }) => {
+export const getAnalyzeFilesForReview = async ({ files, githubService }) => {
     const updatedFiles = await Promise.all(
         files.map(async (file) => {
             try {
@@ -41,4 +41,36 @@ export const analyzeFilesForReview = async ({ files, githubService }) => {
         })
     );
     return updatedFiles.filter((f) => !!f);
+};
+
+export const getCodeSnippetOfSelectedLines = async ({
+    gitHubService,
+    comment_file_path,
+    start_line,
+    end_line,
+}) => {
+    const fileContent = await gitHubService.getContent({
+        path: comment_file_path,
+    });
+    const fileLines = fileContent.split("\n");
+
+    const affectedLinesArr = fileLines.slice(start_line - 1, end_line);
+
+    const selectedLinesWithLineNumbers = affectedLinesArr
+        .map((line, index) => `${start_line + index}: ${line}`)
+        .join("\n");
+
+    //some files in pr contains empty line at the end
+    if (fileLines[fileLines.length - 1] === "") {
+        fileLines.pop();
+    }
+
+    const fileContentWithLineNumbers = fileLines
+        .map((line, index) => `${index + 1}: ${line}`)
+        .join("\n");
+
+    return {
+        fileContentWithLineNumbers,
+        selectedLinesWithLineNumbers,
+    };
 };

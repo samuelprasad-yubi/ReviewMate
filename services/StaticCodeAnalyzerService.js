@@ -76,6 +76,7 @@ class StaticCodeAnalyzer {
             message: "static code analysis results",
         });
         await githubService.updatePrDescription(template);
+        return template;
     };
 }
 

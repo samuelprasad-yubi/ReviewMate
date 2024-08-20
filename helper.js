@@ -101,15 +101,21 @@ export const getGithubDetailsTemplateWithFile = ({
     message,
     line,
     filename,
-}) => `<details>
-  <summary>${message}</summary>
+}) => `
 
+<details>
+  <summary>${message}</summary>
   - **File Name:** \`${filename}\`
   - **Line Number:** ${line}
+</details>
 
-</details>`;
+`;
 
-export const getGithubDetailsTemplate = ({ message, content }) => `<details>
+export const getGithubDetailsTemplate = ({ message, content }) => `
+
+<details>
   <summary>${message}</summary>
   ${content}
-</details>`;
+</details>
+
+`;

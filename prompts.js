@@ -7,6 +7,7 @@
 {{ system_prompt }}: Where the user should edit the system prompt to give overall context to model responses.
 /{{ user_message }}: Where the user should provide instructions to the model for generating outputs. */
 }
+import { systemRole } from "./network.js";
 
 export const getPromptForCodeReview = (hello) => `
 Please review the following code changes from a GitHub pull request. Analyze the changes and provide necessary suggestions.
@@ -98,18 +99,50 @@ add position of the code snippet
 //     }
 // ]
 
+export const tablePrompt = `
+
+
+[INST]
+Create a markdown table for a GitHub pull request description with the following two columns:
+1.Files: The file names with fileLink in github link format, fileLink is also provided in input.
+2.Change Summary: A brief summary of the changes made to each file.
+
+Guidelines for what to do:
+For each file provided, generate a row in the table.
+you must never modify the file name or the link, it should be as it is.
+you must include all the files in the table.
+
+
+[/INST]
+
+The table should have the following format:
+
+| Files                                    | Change Summary                                                                         |
+|------------------------------------------|----------------------------------------------------------------------------------------|
+| [filename](fileLink)                     | [Summary]                                                                               |
+| ...                                      | ...                                                                                    |
+                                                                               |
+
+Replace [filename](fileLink) with the filename and fileLink and [Summary] with the corresponding change summaries.
+Ensure the filename is linked to its respective fileLink. don't generate the fileLink, it is already provided in the input.
+`;
+//add actual blob_url key's value for the file name as link.
+
+//Do not add rows for empty or missing data (e.g., if a file is missing blob_url, exclude it from the table).
+//Ensure the file name is linked to its respective blob_url key's value.
+//where the link is the value of the blob_url key for each file object. Display only the file name, not the full path.
+// Guidelines for what not to do:
+// Do not include any files in the table that are not explicitly provided.
+// Do not add any extra columns or data beyond what is specified (only "Files" and "Change Summary").
+// Do not modify or reformat the file names or URLs.
 export const getPromptPrDescription = (
-    hello3
-) => `Analyze the provided code changes and generate a detailed GitHub pull request summary using the following template. Ensure the summary is concise and includes all necessary details related to the changes introduced. generate a pull request summary based on the template.
-.
-code changes in JSON.stringify: ${JSON.stringify(hello3)}
+    fileChanges
+) => `Analyze the provided code changes and generate a detailed GitHub pull request summary using the following template.
+ Ensure the summary is concise and includes all necessary details related to the changes introduced.
+ generate a pull request summary based template.
+
+all the files changes : ${fileChanges}
 it contains array of objects, each object contains the details of the file changes in the pull request.
-analyze the code changes and generate a pull request summary based on the template.
-add review comments on each file changes in the JSON.stringify.
-The analysis can be on a single line or a whole function; it may not always cover the entire file. In the code_snippet field, only the added or modified changes should be shown.
-verify programming language syntax if it is correct or not or suggest changes in the comments.
-
-
 
 
 ## Pull Request Summary
@@ -118,19 +151,14 @@ verify programming language syntax if it is correct or not or suggest changes in
 
 ### Description:
 Provide a concise overview of the changes introduced in this PR. Describe the problem it solves, the feature it adds, or any significant updates.
-
-
 - Issue
 - Issue 
 
+
 ### Changes Made:
 Briefly list the main changes made in this PR. Include key additions, deletions, or modifications.
+${tablePrompt}
 
-- Change 1
-- Change 2
-- Change 3
-
-### Implementation Details:
 
 #### Code Quality:
 Describe any improvements or refactoring done to enhance code quality.
@@ -138,29 +166,22 @@ Describe any improvements or refactoring done to enhance code quality.
 #### Functionality:
 Highlight any new functionality or changes in existing functionality.
 
-#### UI Changes:
-Mention any updates to the user interface, including screenshots if applicable.
 
-#### Performance:
-Note any performance improvements or considerations.
-
-added as many comments as you can for the code changes in the JSON.stringify.
-### code review comments with code snippet(add minium of 10 comments):
-verify programming language syntax  of java if it is correct or not, if there any suggest changes in the comments.
+### code review comments with code snippet:
+added as many comments as you can for the code changes.
+verify programming language syntax if it is correct or not, if there any suggest changes in the comments.
 Provide detailed code review comments based on the following criteria:
-The analysis can be on a single line or a whole function; it may not always cover the entire file. In the code_snippet field, only the added or modified changes should be shown.
-you can add multiple comments for the same code snippet or file if there are multiple suggestions. add comments for multiple files also if there are any. and return all the comments .
-Mention any bugs found in the code and suggest fixes.Highlight any security concerns.
-
-
-### Additional Notes:
-Any other relevant information or considerations for the reviewer. Include any known issues, limitations, or areas needing further attention.
-
-### Checklist:
-- [ ] Code adheres to project coding standards
-- [ ] Tests have been written and passed
-- [ ] Documentation has been updated if necessary
-- [ ] Relevant stakeholders have been notified
+add line number on each comment.
+Identify and explain any potential issues, including but not limited to security vulnerabilities (e.g., injection attacks, data leakage), missing edge cases, and performance bottlenecks.
+Assess the code for readability, maintainability, and adherence to industry best practices, such as proper error handling, input validation, and secure coding standards. Additionally, 
+evaluate the logic and flow for potential bugs or inconsistencies that could lead to failures in production or under edge cases.
+Provide clear and actionable feedback on how to improve the code, with specific recommendations for enhancing its robustness, security, and overall quality."
+you must add all comments inside the following format.
+example:
+<details>
+  <summary>Code review </summary>
+  you must add comment in the here
+</details>;
 
 `;
 
@@ -194,7 +215,26 @@ function addNumbers(a, b) {
         throw new Error('Both arguments must be numbers');
     }
     return a + b;
+\`\`\`
 }`;
+
+export const summarizeIntoShortDescription = (files) => `
+ [INST]
+Your task is to provide a concise summary of the changes. This 
+summary will be used as a prompt while reviewing the file and must be very clear for 
+the AI bot to understand. 
+
+Instructions:
+
+- Focus on summarizing only the changes and stick to the facts.
+- Do not provide any instructions to the bot on how to perform the review.
+- Do not mention that files need a through review or caution about potential issues.
+- Do not mention that these changes affect the logic or functionality of the code.
+- The summary should not exceed 500 words.
+ [/INST]
+here is the code in stringified format
+code : ${JSON.stringify(files)}
+`;
 
 export const reviewFileDiffFunPrompt = (file) => `
 
@@ -297,7 +337,14 @@ def subtract(x, y):
   \`\`\`
   ${file.content}
   \`\`\`
-  
+
+- **File Summary**
+\`\`\`
+${file.summary}
+\`\`\`
+
+
+
 - **Code Changes:** ${file.patch}
 
 ## Respond in JSON Format
@@ -311,23 +358,43 @@ interface Response {
 \`\`\`
 all the fields and its values are required.
 
-[INST] <<SYS>> \n strictly review the code on the code changes only not on the file content or example code \n<</SYS>>\n 
-User: give detailed code review in the comments fields 
-you much include diff code block if you are suggestion a code fix  \`\`\`diff\`\`\` code blocks, marking changes with \`+\` or \`-\` for code suggestions. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
+[INST]
+you must use File content and File Summary as the context to better understand the code changes.
+strictly add comment on the code changes only not on the file content or example code.
+
+[/INST]
+
+[INST] <<SYS>> \n  ${systemRole}  \n<</SYS>>\n 
+
+User:
+Please review the code for any potential issues, including but not limited to security vulnerabilities, missing edge cases, performance bottlenecks, code readability, and adherence to best practices.
+Provide specific feedback on how to improve the code, highlighting areas that may cause problems in production or under edge cases."
+Strictly you must always identify the language and framework used find any syntactical mistakes are present in the code.
+
 you much include a emojis in the comments for example if the comment is about a bug, show 🐞,
-show 💡 for insights etc.
+show 💡 for insights etc you can use any emoji of your choice based on the context.
 Mention line numbers in each comment.
 You must give positive feedback as well if you find best practices.
-if you suggesting something you much include example code snippet on how to do it.
+you much always include code snippet of the solution for the issue.
 not only feedback on the bug you must always provide the solution.
-you must mention criticality of the issue in the each comment if is a bug.
-- critical (show in red color)
-- high  (show in orange color)
-- medium (show in yellow color)
-- low  (show in green color)
+you must mention criticality of the issue in the each comment if it is a bug.
+- critical 🔴
+- high 🟠
+- medium 🟡
+- low 🔵
+include both criticality text and emoji.
 
  [/INST]
 
+
+ [INST]
+you much always include this code block while you are suggesting a code fix,  \`\`\`diff\`\`\` code blocks, marking changes with \`+\` or \`-\` for code suggestions. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
+example: 
+\`\`\`diff
+-    retrn z
++    return z
+\`\`\`
+ [/INST]
 `;
 
 // - **startLine**: The line number in the new hunk where the review comment should start.
@@ -372,6 +439,55 @@ export const getSuggestionCommandPrompt = (file) => {
                }
             ---end_of_code_review---
 
+    `;
+};
+
+export const getGenericPromptForComment = (file) => {
+    return `
+A comment was made on a GitHub PR review for a diff hunk on a file. I would like you to follow 
+the instructions in that comment. 
+
+Input: Code snippet where added is added along with the whole file content after the modifications, diffHunk of the file and Comment chain (including the new comment)  .
+
+
+## Entire file content after the modifications.file content for the context of the code changes.
+\`\`\`
+ ${file.fileContent}
+\`\`\`
+
+##diff hunk of the file
+\`\`\`diff
+${file.diffHunk}
+\`\`\`
+
+            
+## code snippet being commented on
+\`\`\`
+ ${file.selectedLines}
+\`\`\`        
+
+
+
+
+## Instructions
+Please reply directly to the comment (instead of suggesting 
+a reply) and your reply will be posted as-is.
+If the comment contains instructions/requests for you, please comply. 
+
+In your reply, please make sure to begin the reply by tagging the user 
+with "@${file.user}".
+
+## Comment format
+\`@${file.user}: comment\`
+                 
+## Comment chain (including the new comment)
+\`\`\`
+${file.formattedThread}
+\`\`\`
+
+
+## The comment/request that you need to directly reply to
+      ${file.promptText}   
     `;
 };
 
