@@ -1,13 +1,16 @@
+/* eslint-disable no-console */
+/* eslint-disable no-undef */
 import dotenv from "dotenv";
 import fs from "fs";
 import http from "http";
 import { Octokit, App } from "octokit";
 import { createNodeMiddleware } from "@octokit/webhooks";
-import {
-    getPromptForCodeReview2,
-    getPromptPrDescription,
-    getPromptPrTitle,
-} from "./prompts.js";
+import { ReviewCommandHandler } from "./services/ReviewCommandHandler.js";
+import GitHubService from "./services/GitHubService.js";
+import ReviewService from "./services/ReviewService.js";
+import StaticCodeAnalyzer from "./services/StaticCodeAnalyzerService.js";
+import { getAnalyzeFilesForReview } from "./services/FileAnalyzer.js";
+import { updatePrDescriptionWithSummary } from "./pullRequestUpdates.js";
 dotenv.config();
 
 const appId = process.env.APP_ID;
@@ -29,179 +32,78 @@ const app = new App({
     }),
 });
 
-const { data } = await app.octokit.request("/app");
-
-app.octokit.log.debug(`Authenticated as '${data.name}'`);
-
-async function addReviewComment(
-    octokit,
-    owner,
-    repo,
-    pullNumber,
-    commitId,
-    path,
-    position,
-    codeSnippet,
-    comment
-) {
-    console.log({
-        owner,
-        repo,
-        pullNumber,
-        commitId,
-        path,
-        position,
-        codeSnippet,
-        comment,
-    });
-    try {
-        const response = await octokit.rest.pulls.createReviewComment({
-            owner,
-            repo,
-            pull_number: pullNumber,
-            commit_id: commitId,
-            path,
-            position: 1,
-            body: comment,
-        });
-        console.log("Review comment added: ", response.data.html_url);
-    } catch (error) {
-        console.error("Error adding review comment: ", error);
-    }
-}
+// const { data } = await app.octokit.request("/app");
+// app.octokit.log.debug(`Authenticated as '${data.name}'`);
 
 // Subscribe to the "pull_request.opened" webhook event
 app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
     console.log(
         `Received a pull request event for #${payload.pull_request.number}`
     );
+    const githubService = new GitHubService({ octokit, payload });
+    const review = new ReviewService(githubService, octokit);
+    const staticCodeAnalyzer = new StaticCodeAnalyzer();
 
     try {
-        const owner = payload.repository.owner.login;
-        const repo = payload.repository.name;
-        const pull_number = payload.pull_request.number;
-
-        const { data: files } = await octokit.rest.pulls.listFiles({
-            owner,
-            repo,
-            pull_number,
+        const files = await githubService.listFiles();
+        const filteredFiles = await getAnalyzeFilesForReview({
+            files,
+            githubService,
         });
+        await staticCodeAnalyzer.analyzeFiles(filteredFiles);
+        const prTemplate =
+            await staticCodeAnalyzer.updatePRDescription(githubService);
 
-        //PR description
-        await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "mistral",
-                prompt: getPromptPrDescription(files),
-                stream: false,
-                options: {
-                    seed: 42,
-                    top_k: 50,
-                    top_p: 0.95,
-                    temperature: 0.1,
-                    repeat_penalty: 1.2,
-                },
-            }),
-        })
-            .then((response) => response.json())
-            .then(async (data) => {
-                console.log("parseGenResponse", data);
-                await octokit.rest.pulls.update({
-                    owner,
-                    repo,
-                    pull_number,
-                    body: data.response,
-                });
-            })
-            .catch((error) => console.error("Error:", error));
+        const filesContent = files
+            .map(
+                (file) => ` filename: ${file.filename}
+            fileLink: ${file.blob_url}
+            patch:${file.patch} \n`
+            )
+            .join("\n ---end of file--- \n")
+            .concat("\n ---end of file ---\n");
+        await updatePrDescriptionWithSummary(
+            filesContent,
+            githubService,
+            prTemplate
+        );
 
-        //PR title
-        await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "mistral",
-                prompt: getPromptPrTitle(files),
-                stream: false,
-                options: {
-                    seed: 42,
-                    top_k: 50,
-                    top_p: 0.95,
-                    temperature: 0.1,
-                    repeat_penalty: 1.2,
-                },
-            }),
-        })
-            .then((response) => response.json())
-            .then(async (data) => {
-                console.log("parseGenResponse", data);
-                const parseGenResponse = JSON.parse(data.response);
-
-                await octokit.rest.pulls.update({
-                    owner,
-                    repo,
-                    pull_number,
-                    title: parseGenResponse.title,
-                });
-            })
-            .catch((error) => console.error("Error:", error));
-        console.log(`Received a pull request event for fetch, files`, files);
-
-        //review comments for each file
-        files.forEach(async (file) => {
-            await fetch("https://ml-ollama-qa.go-yubi.in/api/generate", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: "mistral",
-                    prompt: getPromptForCodeReview2(file),
-                    stream: false,
-                    options: {
-                        seed: 42,
-                        top_k: 50,
-                        top_p: 0.95,
-                        temperature: 0.1,
-                        repeat_penalty: 1.2,
-                    },
-                }),
-            })
-                .then((response) => response.json())
-                .then(async (data) => {
-                    console.log(`Received a pull request event for`, data);
-
-                    await addReviewComment(
-                        octokit,
-                        owner,
-                        repo,
-                        pull_number,
-                        payload.pull_request.head.sha,
-                        file.filename,
-                        1,
-                        "parseGenAiData.code_snippet",
-                        data.response
-                    );
-                })
-                .catch((error) => console.error("Error:", error));
-        });
-
-        console.log(`Received a pull request event for catch`);
+        await review.byAI({ filteredFiles });
+        await review.submitReviewCommentsToPr();
     } catch (error) {
-        if (error.response) {
-            console.error(
-                `Error! Status: ${error.response.status}. Message: ${error.response.data.message}`
-            );
-        } else {
-            console.error(error);
-        }
+        console.error(error);
     }
 });
+
+app.webhooks.on(
+    ["pull_request_review_comment.created", "pull_request.reopened"],
+    async ({ octokit, payload }) => {
+        // console.log("payload>>>", payload);
+        if (payload.action === "reopened") {
+            console.log("payload", payload);
+            return;
+        }
+        const comment_author = payload.comment.user.login;
+        const comment_body = payload.comment.body;
+        const gitHubService = new GitHubService({ octokit, payload });
+
+        if (comment_author === "reviewzen[bot]") {
+            console.log("Comment made by the app. No reply needed.");
+            return;
+        }
+
+        const commandMatch = comment_body.match(/^@reviewzen\s+(\w+)\s*(.*)$/i);
+
+        const command = commandMatch?.[1].toLowerCase() || "";
+        const promptText = commandMatch?.[2] || comment_body;
+
+        const handler = new ReviewCommandHandler({
+            payload,
+            gitHubService,
+        });
+        await handler.handleCommand({ command, promptText });
+    }
+);
 
 app.webhooks.onError((error) => {
     if (error.name === "AggregateError") {
@@ -219,5 +121,5 @@ const middleware = createNodeMiddleware(app.webhooks, { path });
 
 http.createServer(middleware).listen(port, async () => {
     console.log(`Server is listening for events at: ${localWebhookUrl}`);
-    console.log("Press Ctrl + C to quit.");
+    console.log("Press Ctrl + C to quit....,,");
 });

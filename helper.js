@@ -30,3 +30,92 @@ Respond in the following JSON format.
         position: "<line of the code where comment has to be added>
     }
 ]'`;
+
+export const generateCommentData = (comment) => {
+    const commentData = {
+        path: comment.path,
+        body: comment.comment,
+        line: comment.endLine,
+    };
+
+    if (comment.startLine !== comment.endLine) {
+        commentData.start_line = comment.startLine;
+        commentData.start_side = "RIGHT";
+    }
+    return commentData;
+};
+
+export async function addReviewComment(
+    octokit,
+    owner,
+    repo,
+    pullNumber,
+    commitId,
+    path,
+    position,
+    codeSnippet,
+    comment
+) {
+    console.log({
+        owner,
+        repo,
+        pullNumber,
+        commitId,
+        path,
+        position,
+        codeSnippet,
+        comment,
+    });
+    try {
+        const response = await octokit.rest.pulls.createReviewComment({
+            owner,
+            repo,
+            pull_number: pullNumber,
+            commit_id: commitId,
+            path,
+            position: 1,
+            body: comment,
+        });
+        console.log("Review comment added: ", response.data.html_url);
+    } catch (error) {
+        console.error("Error adding review comment: ", error);
+    }
+}
+
+export const addPatchEndComment = (patch) => `${patch} 
+                            ---end_change_section---`;
+
+export const getHunksStr = (hunks) => `
+---new_hunk---
+\`\`\`
+${hunks.newHunk}
+\`\`\`
+
+---old_hunk---
+\`\`\`
+${hunks.oldHunk}
+\`\`\`
+`;
+
+export const getGithubDetailsTemplateWithFile = ({
+    message,
+    line,
+    filename,
+}) => `
+
+<details>
+  <summary>${message}</summary>
+  - **File Name:** \`${filename}\`
+  - **Line Number:** ${line}
+</details>
+
+`;
+
+export const getGithubDetailsTemplate = ({ message, content }) => `
+
+<details>
+  <summary>${message}</summary>
+  ${content}
+</details>
+
+`;
