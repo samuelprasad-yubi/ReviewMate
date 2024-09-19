@@ -2,12 +2,14 @@
 import { filesAllowedForCodeReview } from "../constants.js";
 
 class GitHubService {
-    constructor(octokit, payload) {
+    constructor({ octokit, payload }) {
         this.octokit = octokit;
         this.owner = payload.repository.owner.login;
         this.repo = payload.repository.name;
         this.pull_number = payload.pull_request.number;
         this.head_commit_sha = payload.pull_request.head.sha;
+        this.comment_id = payload?.comment?.comment_id;
+        this.in_reply_to_id = payload?.comment?.in_reply_to_id;
     }
 
     getContent = async ({ path }) => {
@@ -27,6 +29,7 @@ class GitHubService {
             return fileContent;
         } catch (error) {
             console.log("Error getting file content: ", error);
+            return "";
         }
     };
 
@@ -62,6 +65,7 @@ class GitHubService {
             );
         } catch (error) {
             console.error("Error getting list of files: ", error);
+            return [];
         }
     };
 
@@ -76,6 +80,22 @@ class GitHubService {
             console.log("Successfully updated PR description");
         } catch (error) {
             console.error("Error updating PR description: ", error);
+        }
+    };
+
+    getPrDescription = async () => {
+        try {
+            const response = await this.octokit.rest.pulls.get({
+                owner: this.owner,
+                repo: this.repo,
+                pull_number: this.pull_number,
+            });
+            const description = response.data.body;
+            console.log("PR Description received");
+            return description;
+        } catch (error) {
+            console.error("Error fetching PR description: ", error);
+            return null;
         }
     };
 
@@ -125,6 +145,65 @@ class GitHubService {
         } catch (error) {
             console.error("Error submitting review: ", error);
         }
+    };
+
+    listReviewComments = async () => {
+        try {
+            const { data: reviewComments } =
+                await this.octokit.rest.pulls.listReviewComments({
+                    owner: this.owner,
+                    repo: this.repo,
+                    pull_number: this.pull_number,
+                });
+
+            // console.log("reviewComments [0]", reviewComments[0]);
+            console.log(
+                "reviewComments",
+                reviewComments.map(
+                    (c) => ` ${c.id} --- ${c.in_reply_to_id} ---  ${c.body}`
+                )
+            );
+            return reviewComments;
+        } catch (error) {
+            console.log("Error fetching comments of PR: ", error);
+            return [];
+        }
+    };
+
+    listReviewCommentsOfThread = async () => {
+        try {
+            const reviewComments = await this.listReviewComments();
+            const threadComments = reviewComments.filter(
+                (comment) => comment.in_reply_to_id === this.in_reply_to_id
+            );
+            const topLevelComment = reviewComments.filter(
+                (comment) => comment.id === this.in_reply_to_id
+            );
+            return topLevelComment.concat(threadComments);
+        } catch (error) {
+            console.log("Error fetching comments of a Thread: ", error);
+            return [];
+        }
+    };
+
+    getRoleFormatCommentsOfThread = async () => {
+        const threadComments = await this.listReviewCommentsOfThread();
+        return threadComments.map((c) => ({
+            role:
+                c.user.type.toLowerCase() === "bot"
+                    ? "{{assistant}}"
+                    : `{{${c.user.login}}}`,
+            content: c.body,
+        }));
+    };
+
+    getRoleFormatCommentsOfThreadStr = async () => {
+        const formattedThread = await this.getRoleFormatCommentsOfThread();
+        const formattedThreadStr = formattedThread
+            .map((c) => `${c.role}: ${c.content}`)
+            .join("\n\n");
+
+        return formattedThreadStr;
     };
 }
 
