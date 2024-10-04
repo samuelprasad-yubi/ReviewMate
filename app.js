@@ -10,7 +10,9 @@ import GitHubService from "./services/GitHubService.js";
 import ReviewService from "./services/ReviewService.js";
 import StaticCodeAnalyzer from "./services/StaticCodeAnalyzerService.js";
 import { getAnalyzeFilesForReview } from "./services/FileAnalyzer.js";
-import { updatePrDescriptionWithSummary } from "./pullRequestUpdates.js";
+import { getPRSummary } from "./pullRequestUpdates.js";
+import { generateTable } from "./helper.js";
+
 dotenv.config();
 
 const appId = process.env.APP_ID;
@@ -40,36 +42,35 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
     console.log(
         `Received a pull request event for #${payload.pull_request.number}`
     );
+
     const githubService = new GitHubService({ octokit, payload });
     const review = new ReviewService(githubService, octokit);
-    const staticCodeAnalyzer = new StaticCodeAnalyzer();
-
+    const staticCodeAnalyzer = new StaticCodeAnalyzer({ githubService });
+    // let checkId = null;
     try {
+        // checkId = githubService.createChecks();
         const files = await githubService.listFiles();
         const filteredFiles = await getAnalyzeFilesForReview({
             files,
             githubService,
         });
-        await staticCodeAnalyzer.analyzeFiles(filteredFiles);
+        await staticCodeAnalyzer.analyzeFilesAPI(filteredFiles);
         const prTemplate =
             await staticCodeAnalyzer.updatePRDescription(githubService);
 
-        const filesContent = files
-            .map(
-                (file) => ` filename: ${file.filename}
-            fileLink: ${file.blob_url}
-            patch:${file.patch} \n`
-            )
-            .join("\n ---end of file--- \n")
-            .concat("\n ---end of file ---\n");
-        await updatePrDescriptionWithSummary(
-            filesContent,
-            githubService,
-            prTemplate
-        );
-
+        filteredFiles.map((file) => {
+            console.log(`filename: ${file.file.filename}`);
+        });
         await review.byAI({ filteredFiles });
-        await review.submitReviewCommentsToPr();
+        await review.submitReviewCommentsToPrWhenCommentLessThan({ count: 10 });
+        const fileSummaries = review.getFileSummaries();
+        const table = generateTable(fileSummaries, githubService);
+        const updatedDescription = prTemplate.concat(table);
+        const prSummary = await getPRSummary({ files: fileSummaries });
+        const updatedDescriptionWithSummary = prSummary
+            .concat("\n")
+            .concat(updatedDescription);
+        await githubService.updatePrDescription(updatedDescriptionWithSummary);
     } catch (error) {
         console.error(error);
     }

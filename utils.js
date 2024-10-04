@@ -180,8 +180,8 @@ export function parseReview(response, patches) {
         }
 
         reviews.push({
-            startLine: adjustedStartLine,
-            endLine: adjustedEndLine,
+            startLine: adjustedStartLine || 1,
+            endLine: adjustedEndLine || 1,
             comment: adjustedComment,
         });
 

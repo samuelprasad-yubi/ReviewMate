@@ -7,7 +7,7 @@
 {{ system_prompt }}: Where the user should edit the system prompt to give overall context to model responses.
 /{{ user_message }}: Where the user should provide instructions to the model for generating outputs. */
 }
-import { systemRole } from "./network.js";
+// import { systemRole } from "./network.js";
 
 export const getPromptForCodeReview = (hello) => `
 Please review the following code changes from a GitHub pull request. Analyze the changes and provide necessary suggestions.
@@ -137,13 +137,8 @@ Ensure the filename is linked to its respective fileLink. don't generate the fil
 // Do not modify or reformat the file names or URLs.
 export const getPromptPrDescription = (
     fileChanges
-) => `Analyze the provided code changes and generate a detailed GitHub pull request summary using the following template.
+) => `Analyze the provided code changes and generate a detailed GitHub pull request summary.
  Ensure the summary is concise and includes all necessary details related to the changes introduced.
- generate a pull request summary based template.
-
-all the files changes : ${fileChanges}
-it contains array of objects, each object contains the details of the file changes in the pull request.
-
 
 ## Pull Request Summary
 
@@ -151,39 +146,33 @@ it contains array of objects, each object contains the details of the file chang
 
 ### Description:
 Provide a concise overview of the changes introduced in this PR. Describe the problem it solves, the feature it adds, or any significant updates.
-- Issue
-- Issue 
 
 
-### Changes Made:
-Briefly list the main changes made in this PR. Include key additions, deletions, or modifications.
-${tablePrompt}
-
-
-#### Code Quality:
-Describe any improvements or refactoring done to enhance code quality.
-
-#### Functionality:
-Highlight any new functionality or changes in existing functionality.
-
-
-### code review comments with code snippet:
-added as many comments as you can for the code changes.
-verify programming language syntax if it is correct or not, if there any suggest changes in the comments.
-Provide detailed code review comments based on the following criteria:
-add line number on each comment.
-Identify and explain any potential issues, including but not limited to security vulnerabilities (e.g., injection attacks, data leakage), missing edge cases, and performance bottlenecks.
-Assess the code for readability, maintainability, and adherence to industry best practices, such as proper error handling, input validation, and secure coding standards. Additionally, 
-evaluate the logic and flow for potential bugs or inconsistencies that could lead to failures in production or under edge cases.
-Provide clear and actionable feedback on how to improve the code, with specific recommendations for enhancing its robustness, security, and overall quality."
-you must add all comments inside the following format.
-example:
-<details>
-  <summary>Code review </summary>
-  you must add comment in the here
-</details>;
-
+all the files changes : ${JSON.stringify(fileChanges)}
+it contains array of objects, each object contains the details of the file changes in the pull request.
 `;
+
+// #### Code Quality:
+// Describe any improvements or refactoring done to enhance code quality.
+
+// #### Functionality:
+// Highlight any new functionality or changes in existing functionality.
+
+// ### code review comments with code snippet:
+// added as many comments as you can for the code changes.
+// verify programming language syntax if it is correct or not, if there any suggest changes in the comments.
+// Provide detailed code review comments based on the following criteria:
+// add line number on each comment.
+// Identify and explain any potential issues, including but not limited to security vulnerabilities (e.g., injection attacks, data leakage), missing edge cases, and performance bottlenecks.
+// Assess the code for readability, maintainability, and adherence to industry best practices, such as proper error handling, input validation, and secure coding standards. Additionally,
+// evaluate the logic and flow for potential bugs or inconsistencies that could lead to failures in production or under edge cases.
+// Provide clear and actionable feedback on how to improve the code, with specific recommendations for enhancing its robustness, security, and overall quality."
+// you must add all comments inside the following format.
+// example:
+// <details>
+//   <summary>Code review </summary>
+//   you must add comment in the here
+// </details>;
 
 export const getPromptPrTitle = (hello4) => `
 Generate a concise and descriptive title for a GitHub pull request that includes the key changes made. The title should be short, informative, and to the point.
@@ -236,40 +225,29 @@ here is the code in stringified format
 code : ${JSON.stringify(files)}
 `;
 
+//For any identified issues, provide comments and suggest fixes using \`diff\` code blocks, marking changes with \`+\` or \`-\` for code suggestions and also use code snippets.
+//check for missing edge cases in the code, suggest feedback why this it is a issue and you must provide in detailed explaination if issue is critical with code snippet, suggestion, diff code blocks
+// For minor fixes, use \`suggestion\` code blocks. The line number range in the fix snippet must exactly match the range to be replaced in the new hunk.
+// Format: Use the GitHub suggestion code block syntax to wrap the proposed fix.
+// ${suggestionSample}
 export const reviewFileDiffFunPrompt = (file) => `
-
+{{System}}: You are PR-Reviewer, a language model designed to review a Git Pull Request (PR).
 ## IMPORTANT Instructions
+**Input:** New hunks and old hunks of one of the changed file in a PR. New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.
+**Task:** Review the new hunks for substantive issues.
 
-**Input:** New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.And File content after modification for the context of the code changes.
-
-**Task:** Review the new hunks for substantive issues by utilizing the provided File Content and Example context. For any identified issues, provide comments and suggest fixes using \`diff\` code blocks, marking changes with \`+\` or \`-\` for code suggestions and also use code snippets.
-check for missing edge cases in the code, suggest feedback why this it is a issue and you must provide in detailed explaination if issue is critical with code snippet, suggestion, diff code blocks
-
-
-*** Guidance on Using File Content***
-1. **Contextual Understanding:** Use the entire file content to understand the purpose and logic of the modified code. Consider how the functions, variables, and logic interact across the file to achieve the intended functionality. This will help you assess whether the new code changes are consistent with the overall design and intent of the file.
-2. **Code Use Case:** Reflect on how the modified code works within the broader context of the file. Understanding the use case can help you identify issues such as logic errors, performance concerns, or deviations from best practices.
-3. **Focus on Changes:** While the entire file content is provided to give you context, your review should focus solely on the new code changes presented in the new hunks. Do not review or comment on parts of the file that are outside the scope of these changes. Concentrate on identifying issues or improvements related specifically to the modifications.
-
-For minor fixes, use \`suggestion\` code blocks. The line number range in the fix snippet must exactly match the range to be replaced in the new hunk.
-Format: Use the GitHub suggestion code block syntax to wrap the proposed fix.
-${suggestionSample}
-
-
-**Output:** Your response should include review comments in JSON format, specifying the exact line number ranges in the new hunks where the comment applies. The start and end line numbers should fall within the same hunk. For single-line comments, use the same number for both start and end line.
+**Output:** Your response should include review comments, specifying the exact line number ranges in the new hunks where the comment applies.
+The start and end line numbers should fall within the same hunk. For single-line comments, use the same number for both start and end line.
 
 If there are no issues found on a line range, you MUST respond with the 
 text \`LGTM!\` for that line range in the review section. 
 
 
 ### Example
+you must not comment on the example changes, take this as a reference to understand the task.
 
 **Example Changes:**
-[INST] must not comment on the example changes[/INST]
-
----file_content---
 \`\`\`
-# Full content of the file (after the modifications)
 def divide(x, y):
     if y == 0:
         raise ValueError("Cannot divide by zero")
@@ -317,85 +295,66 @@ def subtract(x, y):
     z = x - y
 \`\`\`
 
-**Example Response:**
 
-\`\`\`json
-{
-  "data": [
-    {
-      "startLine": 8,
-      "endLine": 8,
-      "comment": "There's a syntax error in the add function.\\n\\n\`suggestion\\nreturn z\\n\`"
-    }
-  ]
-}
-\`\`\`
-
-## Review Template
-
-- **File Content After Modifications:** (This is the entire content of the file after modifications were made)
-  \`\`\`
-  ${file.content}
-  \`\`\`
-
-- **File Summary**
-\`\`\`
-${file.summary}
-\`\`\`
+## hunks for the review
+- **Changes:** ${file.patch}
 
 
-
-- **Code Changes:** ${file.patch}
-
-## Respond in JSON Format
-
-Your response should strictly adhere to the following JSON structure:
-
-\`\`\`typescript
-interface Response {
-  data: Array<{startLine: number; endLine: number; comment: string}>
-}
-\`\`\`
 all the fields and its values are required.
 
-[INST]
-you must use File content and File Summary as the context to better understand the code changes.
-strictly add comment on the code changes only not on the file content or example code.
+<<SYS>>
+Note that few lines in the new_hunk body are prefixed with a numbers that represents the line number of the modified changes.
 
-[/INST]
-
-[INST] <<SYS>> \n  ${systemRole}  \n<</SYS>>\n 
-
-User:
-Please review the code for any potential issues, including but not limited to security vulnerabilities, missing edge cases, performance bottlenecks, code readability, and adherence to best practices.
+Please review the code for any potential issues, including but not limited to security vulnerabilities, missing edge cases, performance bottlenecks, code readability, and adherence to best practices etc.
 Provide specific feedback on how to improve the code, highlighting areas that may cause problems in production or under edge cases."
 Strictly you must always identify the language and framework used find any syntactical mistakes are present in the code.
 
 you much include a emojis in the comments for example if the comment is about a bug, show 🐞,
 show 💡 for insights etc you can use any emoji of your choice based on the context.
 Mention line numbers in each comment.
-You must give positive feedback as well if you find best practices.
-you much always include code snippet of the solution for the issue.
-not only feedback on the bug you must always provide the solution.
+You must give positive feedback as well if you find major best practices, not comment on minor best practices.
+you much always include code snippet of the solution for the issue in each comment.
+not only feedback on the bug you must always provide the solution in each comment.
 you must mention criticality of the issue in the each comment if it is a bug.
+add more descriptive review comments with any suggested code changes, explain clearly what is the issue and why it is a issue.
 - critical 🔴
 - high 🟠
 - medium 🟡
 - low 🔵
 include both criticality text and emoji.
+- use diff block for code differences.
 
- [/INST]
-
-
- [INST]
-you much always include this code block while you are suggesting a code fix,  \`\`\`diff\`\`\` code blocks, marking changes with \`+\` or \`-\` for code suggestions. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
-example: 
-\`\`\`diff
--    retrn z
-+    return z
-\`\`\`
- [/INST]
+<<SYS>>
 `;
+
+// **Example Response:**
+
+// \`\`\`json
+// {
+//   "data": [
+//     {
+//       "startLine": 8,
+//       "endLine": 8,
+//       "comment": "There's a syntax error in the add function.\\n\\n\`suggestion\\nreturn z\\n\`"
+//     }
+//   ]
+// }
+// \`\`\`
+
+// *** Guidance on Using File Content***
+// 1. **Contextual Understanding:** Use the entire file content to understand the purpose and logic of the modified code. Consider how the functions, variables, and logic interact across the file to achieve the intended functionality.
+// This will help you assess whether the new code changes are consistent with the overall design and intent of the file.
+// 2. **Code Use Case:** Reflect on how the modified code works within the broader context of the file. Understanding the use case can help you identify issues such as logic errors, performance concerns, or deviations from best practices.
+// 3. **Focus on Changes:** While the entire file content is provided to give you context, your review should focus solely on the new code changes presented in the new hunks.
+// Do not review or comment on parts of the file that are outside the scope of these changes.
+// Concentrate on identifying issues or improvements related specifically to the modifications.
+
+// - **File Content After Modifications:** (This is the entire content of the file after modifications were made)
+//   \`\`\`
+//   ${file.content}
+//   \`\`\`
+
+//[INST] <<SYS>> \n  ${systemRole}  \n<</SYS>>\n
 
 // - **startLine**: The line number in the new hunk where the review comment should start.
 // - **endLine**: The line number in the new hunk where the review comment should end.
@@ -449,15 +408,9 @@ the instructions in that comment.
 
 Input: Code snippet where added is added along with the whole file content after the modifications, diffHunk of the file and Comment chain (including the new comment)  .
 
-
 ## Entire file content after the modifications.file content for the context of the code changes.
 \`\`\`
  ${file.fileContent}
-\`\`\`
-
-##diff hunk of the file
-\`\`\`diff
-${file.diffHunk}
 \`\`\`
 
             
@@ -465,7 +418,6 @@ ${file.diffHunk}
 \`\`\`
  ${file.selectedLines}
 \`\`\`        
-
 
 
 
@@ -510,3 +462,30 @@ ${file.formattedThread}
 //             : ""
 //     }
 //  ---end_of_code_review---
+
+export const x = {
+    id: "chatcmpl-cf1f924e-fd41-47e0-a544-de792f72d8c4",
+    choices: [
+        {
+            finish_reason: "tool_calls",
+            index: 0,
+            message: {
+                content:
+                    '{"fileSummary": "- Added error handling for division by zero\\n- Defined functions add(), multiply(), and subtract()\\n- Typo in line 8 (missing \'u\' in \'return\')\\n- Missing return statement in subtract()", "reviews": [{"startLine": 1, "endLine": 3, "comment": "This code block correctly handles the case of dividing by zero by raising a ValueError. However, it would be better to wrap this in a function, e.g. `def divide(x, y):` and call that function rather than having the check outside of a function."}, {"startLine": 8, "endLine": 8, "comment": "There is a typo in this line, the word \'return\' is missing the \'u\', so it should be `return z` instead of `retrn z`."}, {"startLine": 10, "endLine": 11, "comment": "The multiply function looks good - it correctly returns the product of x and y."}, {"startLine": 13, "endLine": 14, "comment": "The subtract function is missing a return statement. It should be `return z` at the end to actually return the result of the subtraction."}]}',
+                role: "assistant",
+                tool_calls: null,
+                function_call: null,
+            },
+        },
+    ],
+    created: 1727507797,
+    model: "anthropic.claude-3-sonnet-20240229-v1:0",
+    object: "chat.completion",
+    system_fingerprint: null,
+    usage: {
+        completion_tokens: 353,
+        prompt_tokens: 608,
+        total_tokens: 961,
+        completion_tokens_details: null,
+    },
+};

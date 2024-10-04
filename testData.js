@@ -102,7 +102,8 @@ export const testDataGithubCodeChanges = [
             '+            return   user.setRole("ROLE_ADMIN");\n' +
             "         } else {\n" +
             '             throw new RuntimeException("Role Not Found!");\n' +
-            "         }",
+            "         }"+
+            "",
     },
     {
         sha: "05017c93efa244a8ea64cb8737f9dd93831bbabc",

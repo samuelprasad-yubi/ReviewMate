@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { filesAllowedForCodeReview } from "../constants.js";
+import crypto from "crypto";
 
 class GitHubService {
     constructor({ octokit, payload }) {
@@ -205,6 +206,58 @@ class GitHubService {
 
         return formattedThreadStr;
     };
+
+    getLineLink = ({ filename, lineStart, lineEnd }) => {
+        const shaFile = crypto
+            .createHash("sha256")
+            .update(filename, "utf8")
+            .digest("hex");
+
+        if (!lineStart) {
+            return `https://github.com/${this.owner}/${this.repo}/pull/${this.pull_number}/files#diff-${shaFile}`;
+        }
+
+        if (lineStart && lineEnd) {
+            return `https://github.com/${this.owner}/${this.repo}/pull/${this.pull_number}/files#diff-${shaFile}R${lineStart}-R${lineEnd}`;
+        }
+
+        return `https://github.com/${this.owner}/${this.repo}/pull/${this.pull_number}/files#diff-${shaFile}R${lineStart}`;
+    };
+
+    // createChecks = async () => {
+    //     try {
+    //         await this.octokit.rest.checks.create({
+    //             owner: this.owner,
+    //             repo: this.repo,
+    //             name: "My Custom Check",
+    //             head_sha: this.head_commit_sha,
+    //             status: "in_progress",
+    //             started_at: new Date().toISOString(),
+    //         });
+    //     } catch (error) {
+    //         console.error("Error creating checks: ", error);
+    //     }
+    // };
+
+    // updateChecks = async ({ checkId }) => {
+    //     try {
+    //         await this.octokit.rest.checks.update({
+    //             owner: this.owner,
+    //             repo: this.repo,
+    //             check_run_id: checkId,
+    //             status: "completed",
+    //             conclusion: "success",
+    //             completed_at: new Date().toISOString(),
+    //             output: {
+    //                 title: "My Custom Check",
+    //                 summary: "All tests passed successfully.",
+    //                 text: "This is a detailed message about the check run.",
+    //             },
+    //         });
+    //     } catch (error) {
+    //         console.error("Error updating checks: ", error);
+    //     }
+    // };
 }
 
 export default GitHubService;

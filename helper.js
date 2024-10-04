@@ -1,3 +1,5 @@
+import path from "path";
+
 export const getPrompthello = (hello) => `
 Please review the following code changes from a GitHub pull request. Analyze the changes and provide necessary suggestions and Analyze the changes based on the following criteria.
 
@@ -34,7 +36,7 @@ Respond in the following JSON format.
 export const generateCommentData = (comment) => {
     const commentData = {
         path: comment.path,
-        body: comment.comment,
+        body: `${comment.comment}`,
         line: comment.endLine,
     };
 
@@ -101,12 +103,13 @@ export const getGithubDetailsTemplateWithFile = ({
     message,
     line,
     filename,
+    lineLink,
 }) => `
 
 <details>
-  <summary>${message}</summary>
-  - **File Name:** \`${filename}\`
-  - **Line Number:** ${line}
+  <summary>${message}</summary> \n
+   **File Name:** \`${filename}\`
+   **Line Number:** [${line}](${lineLink})
 </details>
 
 `;
@@ -119,3 +122,61 @@ export const getGithubDetailsTemplate = ({ message, content }) => `
 </details>
 
 `;
+
+// export function generateTable(fileSummaries, githubService) {
+//     // Initialize the table with headers
+//     let table = `| Filename | File Summary | Count |\n|----------|---------------|----------|`;
+
+//     // Loop through each file in the fileSummaries array
+//     fileSummaries.forEach((fileSummaryItem) => {
+//         // Destructure filename and summary from the file object
+//         const { filteredFile, fileSummary } = fileSummaryItem;
+//         const { filename, additions, deletions, blob_url } = filteredFile.file;
+//         const basename = path.basename(filename);
+//         // Format fileSummary as bullet points
+//         const formattedSummary = fileSummary
+//             .map((item) => `${item}`)
+//             .join("<br>");
+//         const fileLink = githubService.getLineLink({ filename });
+
+//         table += `\n| [${basename}](${blob_url}) | ${formattedSummary} | [+${additions}/-${deletions}](${fileLink}) |`;
+//     });
+
+//     return table;
+// }
+
+export function generateTable(fileSummaries, githubService) {
+    let table = `<table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>File Summary</th>
+                <th>Additions/Deletions</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    fileSummaries.forEach((fileSummaryItem) => {
+        const { filteredFile, fileSummary } = fileSummaryItem;
+        const { filename, additions, deletions, blob_url } = filteredFile.file;
+        const basename = path.basename(filename);
+
+        const formattedSummary = fileSummary
+            .map((item) => `${item}`)
+            .join("<br>");
+        const fileLink = githubService.getLineLink({ filename });
+
+        table += `
+            <tr>
+                <td><a href="${blob_url}">${basename}</a></td>
+                <td>${formattedSummary}</td>
+                <td><a href="${fileLink}">+${additions}/-${deletions}</a></td>
+            </tr>`;
+    });
+
+    table += `
+        </tbody>
+    </table>`;
+
+    return table;
+}

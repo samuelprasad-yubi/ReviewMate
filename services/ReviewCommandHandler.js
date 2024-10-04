@@ -38,9 +38,10 @@ export class ReviewCommandHandler {
                 prompt,
                 options: { system: "" },
             });
+            const reply = data.choices[0].message.content;
 
             await this.gitHubService.createReplyForReviewComment({
-                replyBody: data.response,
+                replyBody: reply,
                 comment_id: this.comment_id,
             });
 

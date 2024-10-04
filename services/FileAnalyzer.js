@@ -29,9 +29,11 @@ export const getAnalyzeFilesForReview = async ({ files, githubService }) => {
                 if (patches.length <= 0) {
                     return null;
                 }
+                console.log("file start");
                 const fileContent = await githubService.getContent({
                     path: file.filename,
                 });
+                console.log("file end");
 
                 return { file, patches, fileDiff: file.patch, fileContent };
             } catch (e) {

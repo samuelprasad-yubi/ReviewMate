@@ -17,6 +17,7 @@
         "@typescript-eslint/parser": "^8.1.0",
         "@typescript-eslint/typescript-estree": "^8.1.0",
         "acorn": "^8.12.1",
+        "crypto": "^1.0.1",
         "dotenv": "^16.4.5",
         "eslint": "^9.9.0",
         "localtunnel": "^2.0.2",

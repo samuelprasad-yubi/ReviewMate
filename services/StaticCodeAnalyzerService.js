@@ -7,7 +7,7 @@ import {
 import { analyzeWithESLint } from "../staticCode/staticCodeAnalysis.js";
 
 class StaticCodeAnalyzer {
-    constructor() {
+    constructor({ githubService }) {
         this.staticCodeAnalysisResultsArray = [];
         this.executionMap = {
             ".js": this.analyzeHunkJavaScript,
@@ -15,6 +15,7 @@ class StaticCodeAnalyzer {
             ".ts": this.analyzeHunkJavaScript,
             ".tsx": this.analyzeHunkJavaScript,
         };
+        this.githubService = githubService;
     }
 
     analyzeFiles = async (filteredFiles) => {
@@ -37,6 +38,42 @@ class StaticCodeAnalyzer {
         }
     };
 
+    analyzeFilesAPI = async (filteredFiles) => {
+        for (const filteredFile of filteredFiles) {
+            try {
+                const ext = path.extname(filteredFile.file.filename);
+                const json = await fetch("http://localhost:8000/analyze", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        language: ext,
+                        code: filteredFile.fileContent,
+                    }),
+                });
+                const data = await json.json();
+                console.log("data", data.result?.[0]?.messages || []);
+                const messages = data.result?.[0]?.messages || [];
+                for (const message of messages) {
+                    const lineLink = this.githubService.getLineLink({
+                        filename: filteredFile.file.filename,
+                        lineStart: message.line,
+                    });
+                    const template = getGithubDetailsTemplateWithFile({
+                        message: `- ${message.message} (${message.ruleId})`,
+                        filename: filteredFile.file.filename,
+                        line: message.line,
+                        lineLink: lineLink,
+                    });
+                    this.staticCodeAnalysisResultsArray.push(template);
+                }
+            } catch (e) {
+                console.log("error", e);
+            }
+        }
+    };
+
     analyzeHunkJavaScript = async ({
         hunk,
         hunkStartLine,
@@ -55,10 +92,15 @@ class StaticCodeAnalyzer {
                         message.line >= hunkStartLine &&
                         message.line <= hunkEndLine
                     ) {
+                        const lineLink = this.githubService.getLineLink({
+                            filename,
+                            lineStart: message.line,
+                        });
                         const template = getGithubDetailsTemplateWithFile({
                             message: `- ${message.message} (${message.ruleId})`,
                             filename: filename,
                             line: message.line,
+                            lineLink: lineLink,
                         });
                         this.staticCodeAnalysisResultsArray.push(template);
                     }
@@ -70,11 +112,15 @@ class StaticCodeAnalyzer {
     };
 
     updatePRDescription = async (githubService) => {
+        if (!this.staticCodeAnalysisResultsArray.length) {
+            return "";
+        }
         const content = this.staticCodeAnalysisResultsArray.join("\n");
         const template = getGithubDetailsTemplate({
             content: content,
             message: "static code analysis results",
         });
+
         await githubService.updatePrDescription(template);
         return template;
     };

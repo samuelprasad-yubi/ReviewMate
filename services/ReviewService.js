@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 import { addPatchEndComment, generateCommentData } from "../helper.js";
-import { connectLLm } from "../network.js";
+import { connectLLm, responseSchema } from "../network.js";
 import {
     reviewFileDiffFunPrompt,
-    summarizeIntoShortDescription,
+    // summarizeIntoShortDescription,
 } from "../prompts.js";
 import { parseReview } from "../utils.js";
 
@@ -12,11 +12,17 @@ class ReviewService {
         this.reviewComments = [];
         this.githubService = githubService;
         this.octokit = octokit;
+        this.fileSummaries = [];
     }
 
     addCommentsToBuffer = (fileName, parsedReviewComments) => {
         parsedReviewComments
-            .filter((p) => p.endLine && p.startLine && p.comment)
+            .map((review) => ({
+                startLine: review.startLine || 1,
+                endLine: review.endLine || 1,
+                comment: review.comment,
+            }))
+            .filter((p) => !!p.comment)
             .forEach((review) => {
                 this.reviewComments.push({
                     path: fileName,
@@ -33,35 +39,43 @@ class ReviewService {
 
     processFilePatches = async (filteredFile) => {
         try {
+            // console.log("processFilePatches");
             const patchText = filteredFile.patches
                 .map((patch) => {
                     return addPatchEndComment(patch.hunksStr);
                 })
                 .join("\n");
             //summarizeIntoShortDescription
-            const summary = await connectLLm({
-                prompt: summarizeIntoShortDescription(filteredFile),
-                options: { system: "programmer" },
-            });
-            console.log("summary", summary.response);
+            // const summary = await connectLLm({
+            //     prompt: summarizeIntoShortDescription(filteredFile),
+            //     options: { system: "programmer" },
+            // });
+            // console.log("patchText>>>>", patchText);
             const prompt = reviewFileDiffFunPrompt({
                 fileName: filteredFile.file.filename,
                 patch: patchText,
                 content: filteredFile.fileContent,
-                summary: summary.response,
+                // summary: summary.response,
             });
 
             // console.log("prompt", { prompt });
 
             const data = await connectLLm({
                 prompt,
-                options: { format: "json" },
+                responseSchema,
             });
-
-            const parsedReviewComments = this.parseLLMResponse(
-                data,
-                filteredFile.patches
+            console.log("data", data);
+            console.log(
+                "data message.content",
+                data.choices[0].message.content
             );
+            const response = data.choices[0].message.content;
+            const parseGenResponse = JSON.parse(response);
+
+            const parsedReviewComments = this.parseLLMResponse({
+                parseGenResponse,
+                filteredFile,
+            });
 
             // const data2 = await connectLLm({
             //     prompt,
@@ -77,34 +91,39 @@ class ReviewService {
                 ...parsedReviewComments,
                 // ...parsedReviewComments2,
             ]);
+
+            if (this.reviewComments.length >= 10) {
+                await this.submitReviewCommentsToPr();
+                this.reviewComments = [];
+            }
+            // console.log("processFilePatches  end");
         } catch (e) {
             console.log(e);
         }
     };
 
-    parseLLMResponse = (data, patches) => {
+    parseLLMResponse = ({ parseGenResponse, filteredFile }) => {
         try {
-            console.log("response", { response: data.response });
+            // console.log("response>>>", { response });
+            console.log("parseGenResponse", { parseGenResponse });
 
-            const parseGenResponse = JSON.parse(data.response);
-            if (
-                parseGenResponse?.data &&
-                Array.isArray(parseGenResponse?.data)
-            ) {
-                const filteredParseGenResponse = parseGenResponse.data.filter(
-                    (item) => {
-                        return (
-                            item?.startLine && item?.endLine && item?.comment
-                        );
-                    }
-                );
-
-                // console.log("filteredParseGenResponse", {
-                //     filteredParseGenResponse,
-                //     patches,
-                // });
-                return parseReview(filteredParseGenResponse, patches);
+            if (parseGenResponse?.fileSummary) {
+                this.fileSummaries.push({
+                    filteredFile: filteredFile,
+                    fileSummary: parseGenResponse.fileSummary,
+                });
             }
+
+            if (!Array.isArray(parseGenResponse?.reviews)) return [];
+
+            const filteredParseGenResponse = parseGenResponse.reviews
+                .map((item) => ({
+                    startLine: item.startLine || 1,
+                    endLine: item.endLine || 1,
+                    ...item,
+                }))
+                .filter((item) => !!item?.comment);
+            return parseReview(filteredParseGenResponse, filteredFile.patches);
         } catch (error) {
             console.error("Error parsing LLM response:", error);
         }
@@ -115,6 +134,13 @@ class ReviewService {
         await this.submitReviewComments(this.reviewComments);
     };
 
+    submitReviewCommentsToPrWhenCommentLessThan = async ({ count }) => {
+        if (this.reviewComments.length < count) {
+            console.log("submitting review comments");
+            await this.submitReviewComments(this.reviewComments);
+            this.reviewComments = [];
+        }
+    };
     submitReviewComments = async (reviewCommentsBuffer) => {
         try {
             if (reviewCommentsBuffer.length === 0) {
@@ -137,6 +163,10 @@ class ReviewService {
         } catch (error) {
             console.error("Error submitting review comments:", error);
         }
+    };
+
+    getFileSummaries = () => {
+        return this.fileSummaries;
     };
 }
 
