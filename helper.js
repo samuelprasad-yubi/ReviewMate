@@ -180,3 +180,30 @@ export function generateTable(fileSummaries, githubService) {
 
     return table;
 }
+
+export function generateGitHubPRTemplate(results) {
+    let comment = "### Code Violations Report\n\n";
+    results.forEach((file) => {
+        if (file?.violations?.length) {
+            comment += `<details>\n<summary>File: ${file.filename}</summary>\n\n`;
+
+            file.violations.forEach((violation) => {
+                comment += `- **Violation**: ${violation.message}\n`;
+                comment += `  - **Rule ID**: \`${violation.ruleId}\`\n`;
+                comment += `  - **Rule Set**: ${violation.ruleset}\n`;
+                comment += `  - **Priority**: ${violation.priority}\n`;
+                comment += `  - **Location**: Line ${violation.startLine}, Columns ${violation.begincolumn}-${violation.endcolumn}\n`;
+                comment += `  - [More Info](${violation.externalInfoUrl})\n\n`;
+            });
+            comment += `</details>\n\n`;
+        }
+        if (file.error) {
+            comment += `<details>\n<summary>Error in file: ${file.filename}</summary>\n\n`;
+            comment += `- **Error**: ${file.error}\n\n`;
+            comment += `- **Details**:\n\`\`\`\n${file.details}\n\`\`\`\n`;
+            comment += `</details>\n\n`;
+        }
+    });
+
+    return comment;
+}

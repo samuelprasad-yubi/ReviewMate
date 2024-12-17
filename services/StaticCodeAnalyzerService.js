@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import path from "path";
 import {
+    generateGitHubPRTemplate,
     getGithubDetailsTemplate,
     getGithubDetailsTemplateWithFile,
 } from "../helper.js";
@@ -39,39 +40,57 @@ class StaticCodeAnalyzer {
     };
 
     analyzeFilesAPI = async (filteredFiles) => {
-        for (const filteredFile of filteredFiles) {
-            try {
-                const ext = path.extname(filteredFile.file.filename);
-                const json = await fetch("http://localhost:8000/analyze", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        language: ext,
-                        code: filteredFile.fileContent,
-                    }),
-                });
-                const data = await json.json();
-                console.log("data", data.result?.[0]?.messages || []);
-                const messages = data.result?.[0]?.messages || [];
-                for (const message of messages) {
-                    const lineLink = this.githubService.getLineLink({
-                        filename: filteredFile.file.filename,
-                        lineStart: message.line,
-                    });
-                    const template = getGithubDetailsTemplateWithFile({
-                        message: `- ${message.message} (${message.ruleId})`,
-                        filename: filteredFile.file.filename,
-                        line: message.line,
-                        lineLink: lineLink,
-                    });
-                    this.staticCodeAnalysisResultsArray.push(template);
-                }
-            } catch (e) {
-                console.log("error", e);
-            }
-        }
+        const filesForAnalysis = filteredFiles.map((filteredFile) => {
+            return {
+                code: filteredFile.fileContent,
+                filename: filteredFile.file.filename,
+            };
+        });
+
+        const json = await fetch("http://localhost:8000/analyze", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(filesForAnalysis),
+        });
+        const data = await json.json();
+        console.log("datasdfdsfsdf", data.results || []);
+        return generateGitHubPRTemplate(data.results || []);
+
+        // for (const filteredFile of filteredFiles) {
+        //     try {
+        //         const ext = path.extname(filteredFile.file.filename);
+        //         const json = await fetch("http://localhost:8000/analyze", {
+        //             method: "POST",
+        //             headers: {
+        //                 "Content-Type": "application/json",
+        //             },
+        //             body: JSON.stringify({
+        //                 language: ext,
+        //                 code: filteredFile.fileContent,
+        //             }),
+        //         });
+        //         const data = await json.json();
+        //         console.log("data", data.result?.[0]?.messages || []);
+        //         const messages = data.result?.[0]?.messages || [];
+        //         for (const message of messages) {
+        //             const lineLink = this.githubService.getLineLink({
+        //                 filename: filteredFile.file.filename,
+        //                 lineStart: message.line,
+        //             });
+        //             const template = getGithubDetailsTemplateWithFile({
+        //                 message: `- ${message.message} (${message.ruleId})`,
+        //                 filename: filteredFile.file.filename,
+        //                 line: message.line,
+        //                 lineLink: lineLink,
+        //             });
+        //             this.staticCodeAnalysisResultsArray.push(template);
+        //         }
+        //     } catch (e) {
+        //         console.log("error", e);
+        //     }
+        // }
     };
 
     analyzeHunkJavaScript = async ({
@@ -111,18 +130,14 @@ class StaticCodeAnalyzer {
         }
     };
 
-    updatePRDescription = async (githubService) => {
-        if (!this.staticCodeAnalysisResultsArray.length) {
-            return "";
-        }
-        const content = this.staticCodeAnalysisResultsArray.join("\n");
-        const template = getGithubDetailsTemplate({
-            content: content,
-            message: "static code analysis results",
-        });
+    updatePRDescription = async ({ githubService, content }) => {
+        // const template = getGithubDetailsTemplate({
+        //     content: content,
+        //     message: "static code analysis results",
+        // });
 
-        await githubService.updatePrDescription(template);
-        return template;
+        await githubService.updatePrDescription(content);
+        return content;
     };
 }
 

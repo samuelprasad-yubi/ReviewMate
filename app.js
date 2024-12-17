@@ -54,9 +54,12 @@ app.webhooks.on("pull_request.opened", async ({ octokit, payload }) => {
             files,
             githubService,
         });
-        await staticCodeAnalyzer.analyzeFilesAPI(filteredFiles);
-        const prTemplate =
-            await staticCodeAnalyzer.updatePRDescription(githubService);
+        const staticResult =
+            await staticCodeAnalyzer.analyzeFilesAPI(filteredFiles);
+        const prTemplate = await staticCodeAnalyzer.updatePRDescription({
+            githubService,
+            content: staticResult,
+        });
 
         filteredFiles.map((file) => {
             console.log(`filename: ${file.file.filename}`);
